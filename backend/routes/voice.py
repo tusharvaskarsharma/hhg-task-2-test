@@ -39,6 +39,7 @@ async def voice_endpoint(
     try:
         # 1. Read Audio
         audio_bytes = await audio.read()
+        await audio.close()
         
         # 2. Transcribe
         stt_start = time.perf_counter()

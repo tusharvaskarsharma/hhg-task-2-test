@@ -6,6 +6,7 @@ import uuid
 import subprocess
 import requests
 import numpy as np
+from datetime import datetime
 
 def update_env(slm_enabled: bool):
     env_path = 'backend/.env'
@@ -16,11 +17,14 @@ def update_env(slm_enabled: bool):
         for line in lines:
             if line.startswith('HHG_SLM_ENABLED='):
                 f.write(f'HHG_SLM_ENABLED={str(slm_enabled).lower()}\n')
+            elif line.startswith('CACHE_ENABLED='):
+                continue
             else:
                 f.write(line)
+        f.write('CACHE_ENABLED=false\n')
 
-def wait_for_server():
-    for _ in range(60):
+def wait_for_server(timeout=120):
+    for _ in range(timeout):
         try:
             r = requests.get('http://127.0.0.1:8000/api/ready', timeout=1)
             if r.status_code == 200:
@@ -30,130 +34,252 @@ def wait_for_server():
         time.sleep(1)
     return False
 
+def print_table(components_data):
+    print(f"{'stage':<25} {'avg':>8} {'p50':>8} {'p95':>8} {'p99':>8} {'min':>8} {'max':>8}")
+    print("-" * 79)
+    for stage, latencies in components_data.items():
+        if not latencies:
+            print(f"{stage:<25} {'N/A':>8} {'N/A':>8} {'N/A':>8} {'N/A':>8} {'N/A':>8} {'N/A':>8}")
+            continue
+        avg = np.mean(latencies)
+        p50 = np.percentile(latencies, 50)
+        p95 = np.percentile(latencies, 95)
+        p99 = np.percentile(latencies, 99)
+        _min = np.min(latencies)
+        _max = np.max(latencies)
+        print(f"{stage:<25} {avg:>8.2f} {p50:>8.2f} {p95:>8.2f} {p99:>8.2f} {_min:>8.2f} {_max:>8.2f}")
+
+def format_table_md(components_data):
+    lines = []
+    lines.append("| stage | avg | p50 | p95 | p99 | min | max |")
+    lines.append("|---|---|---|---|---|---|---|")
+    for stage, latencies in components_data.items():
+        if not latencies:
+            lines.append(f"| {stage} | N/A | N/A | N/A | N/A | N/A | N/A |")
+            continue
+        avg = np.mean(latencies)
+        p50 = np.percentile(latencies, 50)
+        p95 = np.percentile(latencies, 95)
+        p99 = np.percentile(latencies, 99)
+        _min = np.min(latencies)
+        _max = np.max(latencies)
+        lines.append(f"| {stage} | {avg:.2f} | {p50:.2f} | {p95:.2f} | {p99:.2f} | {_min:.2f} | {_max:.2f} |")
+    return "\n".join(lines)
+
 def run_benchmark(name, endpoint, is_voice=False):
     print(f"\n--- Running Benchmark: {name} ---")
     url = f'http://127.0.0.1:8000/api/{endpoint}'
     
-    # Warmup
     print("Sending 10 warmup requests...")
     for i in range(10):
         q = f'what is the capital of india {uuid.uuid4()}'
-        if is_voice:
-            with open('example.ogg', 'rb') as f:
-                requests.post(url, files={'audio': ('example.ogg', f, 'audio/ogg')}, data={'language': 'en'})
-        else:
-            requests.post(url, json={'query': q, 'language': 'en', 'top_k': 2})
+        try:
+            if is_voice:
+                with open('example.ogg', 'rb') as f:
+                    requests.post(url, files={'audio': ('example.ogg', f, 'audio/ogg')}, data={'language': 'en'})
+            else:
+                requests.post(url, json={'query': q, 'language': 'en', 'top_k': 2})
+        except:
+            pass
             
     print("Running 100 unique uncached requests...")
-    latencies = []
-    rag_latencies = []
-    partial_latencies = []
-    total_latencies = []
     
-    all_breakdowns = []
-    
+    components = {}
+    expected_keys = []
+    if name == "RAG_ONLY":
+        expected_keys = ["language detection", "tokenization", "embedding", "BM25", "HNSW", "RRF", "metadata lookup", "grounding", "serialization", "total RAG_ONLY"]
+    elif name == "PARTIAL":
+        expected_keys = ["language detection", "tokenization", "embedding", "BM25", "HNSW", "RRF", "metadata lookup", "grounding", "serialization", "SLM/generation", "validation", "total PARTIAL"]
+    elif name == "TOTAL":
+        expected_keys = ["STT", "language detection", "tokenization", "embedding", "BM25", "HNSW", "RRF", "metadata lookup", "grounding", "serialization", "SLM/generation", "validation", "total TOTAL"]
+
+    for k in expected_keys:
+        components[k] = []
+        
+    failures = 0
+    not_benchmarked = False
+
     for i in range(100):
         q = f'what is the capital of india {uuid.uuid4()}'
-        if is_voice:
-            with open('example.ogg', 'rb') as f:
-                r = requests.post(url, files={'audio': ('example.ogg', f, 'audio/ogg')}, data={'language': 'en'})
-        else:
-            r = requests.post(url, json={'query': q, 'language': 'en', 'top_k': 2})
+        try:
+            if is_voice:
+                with open('example.ogg', 'rb') as f:
+                    r = requests.post(url, files={'audio': ('example.ogg', f, 'audio/ogg')}, data={'language': 'en'})
+            else:
+                r = requests.post(url, json={'query': q, 'language': 'en', 'top_k': 2})
+                
+            if name != "RAG_ONLY":
+                if name == "TOTAL":
+                    time.sleep(1.5)
+                else:
+                    time.sleep(0.5)
+                
+            if r.status_code != 200:
+                failures += 1
+                if failures >= 10:
+                    not_benchmarked = True
+                    break
+                continue
+                
+            data = r.json()
+            l = data['latency']
+            bd = l.get('breakdown', {})
             
-        if name != "RAG_ONLY":
-            time.sleep(0.5)
-            
-        if r.status_code != 200:
-            print(f"Error: {r.status_code} {r.text}")
-            continue
-            
-        data = r.json()
-        l = data['latency']
+            if bd.get('embedding_ms', 0) == 0 or bd.get('bm25_ms', 0) == 0 or bd.get('hnsw_ms', 0) == 0:
+                print("INVALID: embedding_ms, bm25_ms, or hnsw_ms is 0.")
+                sys.exit(1)
+                
+            if name == "RAG_ONLY":
+                components["language detection"].append(bd.get("language_detection_ms", 0))
+                components["tokenization"].append(bd.get("tokenization_ms", 0))
+                components["embedding"].append(bd.get("embedding_ms", 0))
+                components["BM25"].append(bd.get("bm25_ms", 0))
+                components["HNSW"].append(bd.get("hnsw_ms", 0))
+                components["RRF"].append(bd.get("rrf_ms", 0))
+                components["metadata lookup"].append(bd.get("metadata_ms", 0))
+                components["grounding"].append(bd.get("grounding_ms", 0))
+                components["serialization"].append(bd.get("serialization_ms", 0))
+                components["total RAG_ONLY"].append(l.get("rag_only_ms", 0))
+                
+            elif name == "PARTIAL":
+                components["language detection"].append(bd.get("language_detection_ms", 0))
+                components["tokenization"].append(bd.get("tokenization_ms", 0))
+                components["embedding"].append(bd.get("embedding_ms", 0))
+                components["BM25"].append(bd.get("bm25_ms", 0))
+                components["HNSW"].append(bd.get("hnsw_ms", 0))
+                components["RRF"].append(bd.get("rrf_ms", 0))
+                components["metadata lookup"].append(bd.get("metadata_ms", 0))
+                components["grounding"].append(bd.get("grounding_ms", 0))
+                components["serialization"].append(bd.get("serialization_ms", 0))
+                components["SLM/generation"].append(bd.get("generation_ms", 0))
+                components["validation"].append(bd.get("validation_ms", 0))
+                components["total PARTIAL"].append(l.get("partial_ms", 0))
+
+            elif name == "TOTAL":
+                components["STT"].append(bd.get("stt_ms", 0))
+                components["language detection"].append(bd.get("language_detection_ms", 0))
+                components["tokenization"].append(bd.get("tokenization_ms", 0))
+                components["embedding"].append(bd.get("embedding_ms", 0))
+                components["BM25"].append(bd.get("bm25_ms", 0))
+                components["HNSW"].append(bd.get("hnsw_ms", 0))
+                components["RRF"].append(bd.get("rrf_ms", 0))
+                components["metadata lookup"].append(bd.get("metadata_ms", 0))
+                components["grounding"].append(bd.get("grounding_ms", 0))
+                components["serialization"].append(bd.get("serialization_ms", 0))
+                components["SLM/generation"].append(bd.get("generation_ms", 0))
+                components["validation"].append(bd.get("validation_ms", 0))
+                components["total TOTAL"].append(l.get("total_ms", 0))
+        except Exception as e:
+            print(f"Exception during request: {e}")
+            failures += 1
+            if failures >= 10:
+                not_benchmarked = True
+                break
+
+    if not_benchmarked:
+        print(f"Results for {name}: NOT BENCHMARKED")
+        return None
         
-        # Based on endpoint and config, determine the reported metric
-        if name == "RAG_ONLY":
-            metric = l['rag_only_ms']
-        elif name == "PARTIAL":
-            metric = l['partial_ms'] if is_voice else l['total_ms']
-        else:
-            metric = l['total_ms']
-            
-        latencies.append(metric)
-        rag_latencies.append(l.get('rag_only_ms', 0))
-        partial_latencies.append(l.get('partial_ms', 0))
-        total_latencies.append(l.get('total_ms', 0))
-        all_breakdowns.append(l.get('breakdown', {}))
-        
-    p50 = np.percentile(latencies, 50)
-    p95 = np.percentile(latencies, 95)
-    _min = np.min(latencies)
-    _max = np.max(latencies)
-    
-    print(f"Results for {name}:")
-    print(f"p50: {p50:.2f} ms")
-    print(f"p95: {p95:.2f} ms")
-    print(f"Min: {_min:.2f} ms")
-    print(f"Max: {_max:.2f} ms")
-    
-    print("\nComponent Breakdown (p50):")
-    for key in all_breakdowns[0].keys():
-        vals = [b.get(key, 0) for b in all_breakdowns]
-        print(f"{key}: {np.percentile(vals, 50):.2f} ms")
-        
-    return p50, p95, _min, _max
+    print_table(components)
+    return components
 
 def main():
-    # Kill existing server if any
     subprocess.run("taskkill /F /IM uvicorn.exe /T", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     
-    # RAG_ONLY
     update_env(False)
     t0 = time.time()
-    p = subprocess.Popen(["uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", "8000", "--env-file", "backend/.env"])
+    p1 = subprocess.Popen(["uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", "8000", "--env-file", "backend/.env"])
     if not wait_for_server():
         print("Server failed to start")
         sys.exit(1)
-    t1 = time.time()
-    startup_time = t1 - t0
-    print(f"Startup/Warmup time (SLM OFF): {startup_time:.2f} s")
+    startup_time_rag = time.time() - t0
     
-    rag_p50, rag_p95, rag_min, rag_max = run_benchmark("RAG_ONLY", "query")
+    rag_data = run_benchmark("RAG_ONLY", "query")
     
-    p.terminate()
-    p.wait()
+    p1.terminate()
+    p1.wait()
     subprocess.run("taskkill /F /IM uvicorn.exe /T", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     
-    # PARTIAL and TOTAL
     update_env(True)
     t0 = time.time()
-    p = subprocess.Popen(["uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", "8000", "--env-file", "backend/.env"])
+    p2 = subprocess.Popen(["uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", "8000", "--env-file", "backend/.env"])
     if not wait_for_server():
         print("Server failed to start")
         sys.exit(1)
-    t1 = time.time()
-    startup_time_slm = t1 - t0
-    print(f"\nStartup/Warmup time (SLM ON): {startup_time_slm:.2f} s")
+    startup_time_slm = time.time() - t0
     
-    part_p50, part_p95, part_min, part_max = run_benchmark("PARTIAL", "query")
-    tot_p50, tot_p95, tot_min, tot_max = run_benchmark("TOTAL", "voice", is_voice=True)
+    part_data = run_benchmark("PARTIAL", "query")
+    tot_data = run_benchmark("TOTAL", "voice", is_voice=True)
     
-    p.terminate()
-    p.wait()
+    p2.terminate()
+    p2.wait()
     subprocess.run("taskkill /F /IM uvicorn.exe /T", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    verdict = "PASS" if (rag_p50 <= 50 and rag_p95 <= 50) else "FAIL"
+    rag_p50 = np.percentile(rag_data["total RAG_ONLY"], 50)
+    rag_p95 = np.percentile(rag_data["total RAG_ONLY"], 95)
     
+    part_p50 = np.percentile(part_data["total PARTIAL"], 50) if part_data else 0
+    tot_p50 = np.percentile(tot_data["total TOTAL"], 50) if tot_data else 0
+    
+    if rag_p50 <= 50 and rag_p95 <= 50:
+        verdict = "PASS"
+    else:
+        verdict = "FAIL"
+        
+    validation_logic = "TOTAL >= PARTIAL >= RAG_ONLY: "
+    if part_data and tot_data:
+        if tot_p50 >= part_p50 >= rag_p50:
+            validation_logic += "PASS"
+        else:
+            validation_logic += "FAIL"
+    else:
+        validation_logic += "N/A (NOT BENCHMARKED)"
+
     print("\n=================================")
     print("FINAL REPORT")
     print("=================================")
-    print(f"COLD START (SLM ON): {startup_time_slm:.2f} s")
-    print("\nWARM 100-REQUEST BENCHMARK:")
-    print(f"RAG_ONLY: p50={rag_p50:.2f} / p95={rag_p95:.2f} / min={rag_min:.2f} / max={rag_max:.2f}")
-    print(f"PARTIAL:  p50={part_p50:.2f} / p95={part_p95:.2f} / min={part_min:.2f} / max={part_max:.2f}")
-    print(f"TOTAL:    p50={tot_p50:.2f} / p95={tot_p95:.2f} / min={tot_min:.2f} / max={tot_max:.2f}")
+    print(f"COLD START")
+    print(f"startup/warmup time (SLM OFF): {startup_time_rag:.2f} s")
+    print(f"startup/warmup time (SLM ON): {startup_time_slm:.2f} s")
+    print("\nWARM BENCHMARK")
+    print("100 unique requests")
+    print(f"\nRAG_ONLY: p50={rag_p50:.2f}ms, p95={rag_p95:.2f}ms")
     
-    print("\nFINAL VERDICT:")
-    print(f"{verdict} (RAG_ONLY <= 50ms requirement)")
+    md_content = f"# Benchmark Results\n\n"
+    md_content += f"- **Timestamp:** {datetime.now().isoformat()}\n"
+    md_content += f"- **Number of Requests:** 100 per tier\n"
+    md_content += f"- **Warmup Status:** Completed\n"
+    md_content += f"- **Cache-Bypass Status:** UUIDs used\n"
+    md_content += f"- **Cold-start Latency (SLM OFF):** {startup_time_rag:.2f} s\n"
+    md_content += f"- **Cold-start Latency (SLM ON):** {startup_time_slm:.2f} s\n\n"
     
+    md_content += f"## RAG_ONLY Statistics\n"
+    md_content += format_table_md(rag_data) + "\n\n"
+    
+    md_content += f"## PARTIAL Statistics\n"
+    if part_data:
+        md_content += format_table_md(part_data) + "\n\n"
+    else:
+        md_content += "NOT BENCHMARKED\n\n"
+        
+    md_content += f"## TOTAL Statistics\n"
+    if tot_data:
+        md_content += format_table_md(tot_data) + "\n\n"
+    else:
+        md_content += "NOT BENCHMARKED\n\n"
+        
+    md_content += f"## Final Verdict\n"
+    md_content += f"**RAG_ONLY Target (<=50ms):** {verdict}\n"
+    md_content += f"**Logic Check:** {validation_logic}\n"
+    
+    with open("benchmark_results.md", "w") as f:
+        f.write(md_content)
+        
+    print("\nResults saved to benchmark_results.md")
+    print("\n" + verdict)
+    
+    if verdict == "FAIL":
+        sys.exit(1)
+
 if __name__ == '__main__':
     main()

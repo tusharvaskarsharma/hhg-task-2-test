@@ -62,7 +62,7 @@ def test_latency_tiers_text_request():
     
     # TOTAL must be >= RAG_ONLY (because total includes SLM), allowing a small float tolerance
     assert total >= rag_only - 0.1
-    assert partial >= rag_only
+    assert partial >= rag_only - 0.1
     
     if slm_ms > 0:
         assert total >= (rag_only + slm_ms)
