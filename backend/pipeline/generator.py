@@ -183,9 +183,14 @@ class GeneratorService:
 
         grounded = decision == GroundingDecision.SUPPORTED
 
+        if answer_source == "generated-unavailable":
+            final_source = answer_source
+        else:
+            final_source = answer_source if grounded else "abstain"
+
         return {
             "answer": answer,
-            "answer_source": answer_source if grounded else "abstain",
+            "answer_source": final_source,
             "grounding": {
                 "enabled": True,
                 "grounded": grounded,

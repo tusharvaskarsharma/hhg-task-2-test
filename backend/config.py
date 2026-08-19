@@ -61,6 +61,12 @@ class Settings:
     GROUNDING_TOP_K = int(os.getenv("HHG_GROUNDING_TOP_K", "5"))
     MAX_CONTEXT_CHARS = int(os.getenv("HHG_MAX_CONTEXT_CHARS", "12000"))
 
+    # Extractive Settings
+    EXTRACTIVE_MIN_QUERY_COVERAGE = float(os.getenv("HHG_EXTRACTIVE_MIN_QUERY_COVERAGE", "0.60"))
+    EXTRACTIVE_MIN_SCORE = float(os.getenv("HHG_EXTRACTIVE_MIN_SCORE", "0.20"))
+    EXTRACTIVE_REQUIRE_LANGUAGE_MATCH = parse_bool(os.getenv("HHG_EXTRACTIVE_REQUIRE_LANGUAGE_MATCH"), default=True)
+    EXTRACTIVE_MAX_SENTENCE_CHARS = int(os.getenv("HHG_EXTRACTIVE_MAX_SENTENCE_CHARS", "500"))
+
     @property
     def manifest_path(self):
         return os.path.join(self.HHG_ARTIFACT_DIR, "config.json")

@@ -74,7 +74,12 @@ async def query_endpoint(req: QueryRequest, request: Request, response: Response
             else:
                 # SLM failed or ungrounded — fall back to extractive
                 final_answer = ext_answer
-                answer_source = "extractive"
+                
+                if answer_source == "generated-unavailable" and ext_decision != ExtractiveDecision.SUPPORTED:
+                    pass # keep generated-unavailable
+                else:
+                    answer_source = "extractive" if ext_decision == ExtractiveDecision.SUPPORTED else "abstain"
+                    
                 grounding_obj = {
                     "enabled": True,
                     "grounded": ext_decision == ExtractiveDecision.SUPPORTED,

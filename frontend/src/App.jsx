@@ -16,6 +16,7 @@ import gsap from 'gsap';
 const App = () => {
   const [sysStatus, setSysStatus] = useState(null);
   const [selectedLang, setSelectedLang] = useState('en');
+  const [isGenerateEnabled, setIsGenerateEnabled] = useState(false);
   
   const textAPI = useQuery();
   const voiceAPI = useVoice();
@@ -35,7 +36,11 @@ const App = () => {
 
   const handleTextSubmit = (query, lang) => {
     voiceAPI.reset();
-    textAPI.submitQuery(query, lang);
+    textAPI.submitQuery(query, lang, 5, isGenerateEnabled);
+  };
+
+  const handleVoiceStop = () => {
+    voiceAPI.stopRecordingAndSubmit(selectedLang, 5, isGenerateEnabled);
   };
 
   const isBusy = textAPI.loading || ['RECORDING', 'PROCESSING'].includes(voiceAPI.state);
@@ -64,16 +69,31 @@ const App = () => {
               setSelectedLang={setSelectedLang}
             />
           </div>
-          {sysStatus?.saaras?.enabled && (
-            <div className="shrink-0 relative z-20">
-              <VoiceInput 
-                state={voiceAPI.state}
-                onStart={voiceAPI.startRecording}
-                onStop={() => voiceAPI.stopRecordingAndSubmit(selectedLang)}
-                disabled={textAPI.loading}
-              />
-            </div>
-          )}
+          <div className="shrink-0 relative z-20">
+            <VoiceInput 
+              state={voiceAPI.state}
+              onStart={voiceAPI.startRecording}
+              onStop={handleVoiceStop}
+              disabled={textAPI.loading}
+            />
+          </div>
+        </div>
+
+        {/* Generate Toggle */}
+        <div className="w-full mb-8 flex items-center justify-end space-x-3 gsap-stagger-item">
+          <span className="text-sm font-medium text-textMuted">
+            {isGenerateEnabled ? 'Grounded SLM mode' : 'Fast extractive mode'}
+          </span>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input 
+              type="checkbox" 
+              className="sr-only peer" 
+              checked={isGenerateEnabled}
+              onChange={(e) => setIsGenerateEnabled(e.target.checked)}
+              disabled={isBusy}
+            />
+            <div className="w-11 h-6 bg-surface peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-text after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+          </label>
         </div>
 
         {/* Dynamic States */}

@@ -106,7 +106,12 @@ async def voice_endpoint(
                 grounding_obj = gen_grounding
             else:
                 final_answer = ext_answer
-                answer_source = "extractive"
+                
+                if answer_source == "generated-unavailable" and ext_decision != ExtractiveDecision.SUPPORTED:
+                    pass # keep generated-unavailable
+                else:
+                    answer_source = "extractive" if ext_decision == ExtractiveDecision.SUPPORTED else "abstain"
+                    
                 grounding_obj = {
                     "enabled": True,
                     "grounded": ext_decision == ExtractiveDecision.SUPPORTED,
