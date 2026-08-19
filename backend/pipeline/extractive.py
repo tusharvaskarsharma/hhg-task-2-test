@@ -72,7 +72,7 @@ def _score_sentence(sentence: str, query_tokens: set[str]) -> float:
 def build_extractive_answer(
     query: str,
     retrieval_results: List[RetrievalResult],
-) -> Tuple[str, str, List[str]]:
+) -> Tuple[str, str, List[dict]]:
     """
     Build a grounded extractive answer from retrieved passages.
 
@@ -121,7 +121,7 @@ def build_extractive_answer(
     candidates.sort(key=lambda x: x[0], reverse=True)
 
     selected_sentences: List[str] = []
-    selected_sources: List[str] = []
+    selected_sources: List[dict] = []
     seen_sentences: set[str] = set()
     total_chars = 0
 
@@ -133,8 +133,18 @@ def build_extractive_answer(
             break
         selected_sentences.append(sentence)
         seen_sentences.add(norm_sent)
-        if source_id not in selected_sources:
-            selected_sources.append(source_id)
+        
+        # Build dict for sources array to match schema
+        if not any(s.get("doc_id") == source_id for s in selected_sources):
+            # Find the original result to grab rank and source
+            orig_result = next((r for r in retrieval_results if (r.id if hasattr(r, "id") else r.get("id")) == source_id), None)
+            if orig_result:
+                rank = orig_result.rank if hasattr(orig_result, "rank") else orig_result.get("rank", 0)
+                src = orig_result.source if hasattr(orig_result, "source") else orig_result.get("source", "")
+                selected_sources.append({"doc_id": source_id, "rank": rank, "source": src})
+            else:
+                selected_sources.append({"doc_id": source_id, "rank": 0, "source": ""})
+                
         total_chars += len(sentence)
         if len(selected_sentences) >= _MAX_SENTENCES:
             break

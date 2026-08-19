@@ -1,15 +1,9 @@
 {
-  "timestamp": "2026-08-19T19:41:25.926923Z",
-  "commit": "8332784f32ed1793fb2937a9cbd40c2d1164145d",
+  "timestamp": "2026-08-19T21:02:28.950406Z",
+  "commit": "6a1d49921f85f73570193ee3d94d5f4ad3109069",
   "python": "3.13.14",
   "platform": "Windows-11-10.0.26200-SP0",
   "artifact_root": "e:\\HHG_T2\\HHG\\hhg_rag_artifacts",
   "artifact_manifest_sha256": "a7a071b88f6f6800",
-  "baseline_rag_only_p50_ms": 17.19,
-  "baseline_rag_only_p95_ms": 24.43,
-  "baseline_partial_p50_ms": 254.04,
-  "baseline_partial_p95_ms": 725.12,
-  "baseline_total_p50_ms": "NOT_MEASURED",
-  "baseline_total_p95_ms": "NOT_MEASURED",
-  "notes": "TOTAL not measured due to Sarvam STT API rate limiting during benchmark"
+  "notes": "Prepared for final benchmark"
 }

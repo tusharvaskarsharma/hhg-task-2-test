@@ -70,12 +70,12 @@ def test_extractive_multilingual_hindi():
 
 def test_extractive_source_ids_match_results():
     results = [
-        _make_result("doc-abc", "Climate change is affecting global temperatures rapidly.", 0.8),
-        _make_result("doc-xyz", "Rising temperatures lead to melting of polar ice caps.", 0.6),
+        RetrievalResult(doc_id="doc-abc", text="Blue whales live in oceans.", score=0.9, rank=1, source="bm25"),
+        RetrievalResult(doc_id="doc-xyz", text="It is the largest animal.", score=0.8, rank=2, source="hnsw"),
     ]
-    answer, decision, sources = build_extractive_answer("climate change temperature", results)
-    if decision == ExtractiveDecision.SUPPORTED:
-        assert all(s in ["doc-abc", "doc-xyz"] for s in sources)
+    ans, decision, sources = build_extractive_answer("where do blue whales live", results)
+    assert decision == ExtractiveDecision.SUPPORTED
+    assert "doc-abc" in [s.get("doc_id") for s in sources]
 
 
 def test_extractive_respects_max_length():

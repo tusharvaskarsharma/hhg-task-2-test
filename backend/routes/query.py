@@ -125,8 +125,8 @@ async def query_endpoint(req: QueryRequest, request: Request, response: Response
         # RAG_ONLY = retrieval + extractive (no STT, no SLM)
         rag_only_ms = ret_res["rag_only_base_ms"] + extractive_ms
 
-        # PARTIAL = RAG_ONLY + optional SLM
-        partial_ms = rag_only_ms + grounding_ms + generation_ms + grounding_validation_ms
+        # PARTIAL = total time (since there is no STT in text query)
+        partial_ms = total_latency_ms
 
         # ── Retrieval breakdown ────────────────────────────────────────────
         def get_source(r):

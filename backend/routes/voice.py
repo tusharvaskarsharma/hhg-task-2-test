@@ -7,6 +7,7 @@ from backend.schemas.response import QueryResponse, ErrorResponse, APIErrorDetai
 from backend.pipeline.stt import stt_service, STTServiceError
 from backend.pipeline.retrieval_service import retrieval_service
 from backend.pipeline.generator import generator_service
+from backend.pipeline.extractive import build_extractive_answer, ExtractiveDecision
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -23,7 +24,8 @@ async def voice_endpoint(
     response: Response,
     audio: UploadFile = File(...),
     language: Optional[str] = Form(None),
-    top_k: int = Form(10)
+    top_k: int = Form(10),
+    generate: bool = Form(False)
 ):
     req_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
     response.headers["X-Request-ID"] = req_id
@@ -32,7 +34,7 @@ async def voice_endpoint(
         err = APIErrorDetail(code="SERVICE_UNAVAILABLE", message="Backend not ready")
         return Response(content=ErrorResponse(error=err).model_dump_json(), status_code=503, media_type="application/json")
         
-    logger.info(f"ReqID: {req_id} | POST /api/voice | file: {audio.filename}")
+    logger.info(f"ReqID: {req_id} | POST /api/voice | file: {audio.filename} | generate: {generate}")
     
     start_time = time.perf_counter()
     
@@ -54,18 +56,65 @@ async def voice_endpoint(
         # 4. Retrieval
         ret_res = retrieval_service.execute_query(transcript_text, final_lang, top_k)
         
-        # 5. Generation
-        gen_res = generator_service.generate(transcript_text, final_lang, ret_res["results"])
+        # 5. Extractive fast path (always run)
+        t_ext = time.perf_counter()
+        ext_answer, ext_decision, ext_sources = build_extractive_answer(
+            transcript_text, ret_res["results"]
+        )
+        extractive_ms = (time.perf_counter() - t_ext) * 1000.0
+
+        # 6. Optional SLM generation
+        generation_ms = 0.0
+        grounding_ms = 0.0
+        grounding_validation_ms = 0.0
+
+        if generate:
+            gen_res = generator_service.generate(transcript_text, final_lang, ret_res["results"])
+            gen_answer = gen_res.get("answer")
+            answer_source = gen_res.get("answer_source", "generated")
+            gen_grounding = gen_res.get("grounding", {})
+            gen_bd = gen_res.get("latency", {})
+            grounding_ms = gen_bd.get("grounding_ms", 0.0)
+            generation_ms = gen_bd.get("generation_ms", 0.0)
+            grounding_validation_ms = gen_bd.get("grounding_validation_ms", 0.0)
+
+            if gen_answer and gen_grounding.get("grounded"):
+                final_answer = gen_answer
+                grounding_obj = gen_grounding
+            else:
+                final_answer = ext_answer
+                answer_source = "extractive"
+                grounding_obj = {
+                    "enabled": True,
+                    "grounded": ext_decision == ExtractiveDecision.SUPPORTED,
+                    "status": ext_decision,
+                    "sources": ext_sources,
+                    "validated": ext_decision == ExtractiveDecision.SUPPORTED,
+                }
+        else:
+            final_answer = ext_answer
+            answer_source = (
+                "extractive" if ext_decision == ExtractiveDecision.SUPPORTED
+                else "abstain"
+            )
+            grounding_obj = {
+                "enabled": True,
+                "grounded": ext_decision == ExtractiveDecision.SUPPORTED,
+                "status": ext_decision,
+                "sources": ext_sources,
+                "validated": ext_decision == ExtractiveDecision.SUPPORTED,
+            }
         
         total_latency_ms = (time.perf_counter() - start_time) * 1000.0
         
-        logger.info(f"ReqID: {req_id} | STT Success | lang: {final_lang} | stt_ms: {stt_latency_ms:.2f} | cache_hit: {ret_res['cache']['hit']}")
+        logger.info(
+            f"ReqID: {req_id} | STT Success | lang: {final_lang} | stt_ms: {stt_latency_ms:.2f} | "
+            f"cache_hit: {ret_res['cache']['hit']} | answer_source: {answer_source}"
+        )
         
         # Breakdown Mapping
         bd = ret_res["latency_breakdown"]
-        gen_bd = gen_res["latency"]
         
-        # Construct pre-serialization breakdown
         breakdown_dict = {
             "stt_ms": stt_latency_ms,
             "language_detection_ms": bd.get("language_detection_ms", 0.0),
@@ -75,26 +124,19 @@ async def voice_endpoint(
             "hnsw_ms": bd.get("hnsw_ms", 0.0),
             "rrf_ms": bd.get("rrf_ms", 0.0),
             "metadata_ms": bd.get("metadata_ms", 0.0),
-            "grounding_ms": gen_bd.get("grounding_ms", 0.0),
-            "slm_ms": 0.0,
-            "generation_ms": gen_bd.get("generation_ms", 0.0),
-            "validation_ms": gen_bd.get("grounding_validation_ms", 0.0)
+            "grounding_ms": grounding_ms,
+            "extractive_ms": extractive_ms,
+            "slm_ms": generation_ms,
+            "generation_ms": generation_ms,
+            "validation_ms": grounding_validation_ms,
         }
         
-        # RAG_ONLY calculation (everything except SLM/STT, plus overhead logic)
-        rag_only_ms = ret_res["rag_only_base_ms"] + breakdown_dict["grounding_ms"]
+        # RAG_ONLY calculation (retrieval + extractive, NO STT, NO SLM)
+        rag_only_ms = ret_res["rag_only_base_ms"] + extractive_ms
 
         # PARTIAL calculation (everything except STT)
         partial_ms = total_latency_ms - stt_latency_ms
         
-        # Metrics requested in Task 5
-        metrics_obj = {
-            "cache_hit": ret_res['cache']['hit'],
-            "retrieval_latency_ms": round(ret_res["rag_only_base_ms"], 2),
-            "total_latency_ms": round(total_latency_ms, 2)
-        }
-        
-        # Retrieval breakdown requested in Task 5
         def get_source(r):
             return r.source if hasattr(r, 'source') else r.get('source', '')
             
@@ -108,15 +150,12 @@ async def voice_endpoint(
             "rrf": rrf_count
         }
 
-        # Validate format for grounding dict
-        grounding_obj = gen_res["grounding"].copy()
-        grounding_obj["validated"] = grounding_obj.get("grounded", False)
-
         t_pre_ser = time.perf_counter()
         resp = QueryResponse(
             query=transcript_text,
             language=final_lang,
-            answer=gen_res["answer"],
+            answer=final_answer,
+            answer_source=answer_source,
             grounding=grounding_obj,
             results=ret_res["results"],
             cache=ret_res["cache"],
@@ -132,7 +171,11 @@ async def voice_endpoint(
             },
             sources=grounding_obj.get("sources", []),
             retrieval=retrieval_obj,
-            metrics=metrics_obj
+            metrics={
+                "cache_hit": ret_res['cache']['hit'],
+                "retrieval_latency_ms": round(ret_res["rag_only_base_ms"], 2),
+                "total_latency_ms": round(total_latency_ms, 2)
+            }
         )
         
         # Mock serialization time for latency injection
