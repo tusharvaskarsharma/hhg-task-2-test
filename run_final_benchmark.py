@@ -233,12 +233,20 @@ def main():
     
     status_str = "PASS" if data else "FAILED"
     slm_calls = data.pop("slm_calls", 0) if data else 0
-    if args.mode == "rag-only" and slm_calls > 0:
-        status_str = "FAIL (SLM was called)"
         
-    p50_val = f"{np.percentile(data[f'total_{args.mode}'], 50):.2f}" if data else "NOT MEASURED"
-    p95_val = f"{np.percentile(data[f'total_{args.mode}'], 95):.2f}" if data else "NOT MEASURED"
-    p99_val = f"{np.percentile(data[f'total_{args.mode}'], 99):.2f}" if data else "NOT MEASURED"
+    p50_val = np.percentile(data[f'total_{args.mode}'], 50) if data else 0.0
+    p95_val = np.percentile(data[f'total_{args.mode}'], 95) if data else 0.0
+    p99_val = np.percentile(data[f'total_{args.mode}'], 99) if data else 0.0
+    
+    if args.mode == "rag-only" and data:
+        if slm_calls > 0:
+            status_str = "FAIL (SLM was called)"
+        elif p50_val > 50 or p95_val > 50 or p99_val > 50:
+            status_str = "FAIL (Latency > 50ms contract)"
+
+    p50_str = f"{p50_val:.2f}" if data else "NOT MEASURED"
+    p95_str = f"{p95_val:.2f}" if data else "NOT MEASURED"
+    p99_str = f"{p99_val:.2f}" if data else "NOT MEASURED"
 
     new_block = f"""
 {title}
@@ -248,9 +256,9 @@ cache_enabled=false
 requests={args.requests}
 warmups=100
 language={lang}
-p50_ms={p50_val}
-p95_ms={p95_val}
-p99_ms={p99_val}
+p50_ms={p50_str}
+p95_ms={p95_str}
+p99_ms={p99_str}
 slm_calls={slm_calls}
 status={status_str}
 """
@@ -262,6 +270,10 @@ status={status_str}
         f.write(new_block)
         
     print(f"Appended results to {report_path}")
+    
+    if "FAIL" in status_str:
+        print(f"Benchmark failed: {status_str}")
+        sys.exit(1)
 
 if __name__ == '__main__':
     main()

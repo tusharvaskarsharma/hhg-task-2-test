@@ -39,9 +39,32 @@ async def voice_endpoint(
     start_time = time.perf_counter()
     
     try:
-        # 1. Read Audio
+        # 1. Read Audio and Validate
         audio_bytes = await audio.read()
         await audio.close()
+        
+        # Validation
+        valid_magic_bytes = [
+            b'OggS', # Ogg
+            b'RIFF', # Wav
+            b'ID3',  # MP3
+            b'\x1a\x45\xdf\xa3', # WebM/MKV
+            b'fLaC', # FLAC
+            b'0&\xb2u\x8ef\xcf\x11' # WMA (ASF)
+        ]
+        
+        is_audio = False
+        for magic in valid_magic_bytes:
+            if audio_bytes.startswith(magic):
+                is_audio = True
+                break
+                
+        # Also check content type loosely
+        is_valid_mime = audio.content_type and (audio.content_type.startswith('audio/') or audio.content_type in ['video/webm', 'video/ogg'])
+        
+        if not (is_audio or is_valid_mime):
+            err = APIErrorDetail(code="INVALID_AUDIO", message="Invalid audio file format")
+            return Response(content=ErrorResponse(error=err).model_dump_json(), status_code=400, media_type="application/json")
         
         # 2. Transcribe
         stt_start = time.perf_counter()

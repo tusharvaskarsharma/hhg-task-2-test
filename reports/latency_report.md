@@ -76,3 +76,29 @@ status=PASS
 | extractive | 0.27 | 0.27 | 0.34 | 0.37 | 0.16 | 0.76 |
 | serialization | 0.13 | 0.13 | 0.18 | 0.22 | 0.09 | 0.25 |
 | total_rag-only | 14.74 | 14.54 | 16.78 | 19.32 | 11.68 | 30.52 |
+
+RAG_ONLY
+slm_enabled=false
+saaras_enabled=false
+cache_enabled=false
+requests=300
+warmups=100
+language=en
+p50_ms=17.80
+p95_ms=32.22
+p99_ms=38.44
+slm_calls=0
+status=PASS
+
+| stage | avg | p50 | p95 | p99 | min | max |
+|---|---|---|---|---|---|---|
+| language detection | 0.02 | 0.02 | 0.04 | 0.06 | 0.01 | 0.11 |
+| tokenization | 0.60 | 0.53 | 1.04 | 1.38 | 0.37 | 1.70 |
+| embedding | 16.74 | 15.24 | 26.37 | 34.68 | 11.10 | 52.42 |
+| BM25 | 1.36 | 1.15 | 2.37 | 6.03 | 0.84 | 8.49 |
+| HNSW | 0.12 | 0.10 | 0.18 | 0.44 | 0.06 | 1.52 |
+| RRF | 0.28 | 0.19 | 1.05 | 1.92 | 0.11 | 3.13 |
+| metadata lookup | 0.05 | 0.04 | 0.09 | 0.21 | 0.03 | 0.64 |
+| extractive | 0.20 | 0.17 | 0.31 | 0.76 | 0.10 | 2.12 |
+| serialization | 0.16 | 0.14 | 0.25 | 0.39 | 0.09 | 0.68 |
+| total_rag-only | 19.61 | 17.80 | 32.22 | 38.44 | 12.94 | 61.55 |

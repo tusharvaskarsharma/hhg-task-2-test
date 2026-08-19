@@ -107,6 +107,7 @@ const App = () => {
                 answer={currentData.answer} 
                 grounding={currentData.grounding}
                 transcription={currentData.transcription}
+                source={currentData.answer_source}
               />
               <RetrievalPanel results={currentData.results} />
               <MetricsPanel latency={currentData.latency} cache={currentData.cache} />
