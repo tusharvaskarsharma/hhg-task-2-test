@@ -76,6 +76,7 @@ def test_embedder_mocked(monkeypatch):
     class PatchedEmbedder(emb.Embedder):
         def __init__(self):
             self.session = MockArtifactLoader.onnx_session
+            self.input_names = [i.name for i in self.session.get_inputs()] if self.session else []
             self.tokenizer = MockTokenizer()
             
     embedder = PatchedEmbedder()

@@ -20,6 +20,7 @@ class RetrievalService:
         self.bm25 = None
         self.hnsw = None
         self.initialized = False
+        self.metadata_maps = {}
 
     def initialize(self):
         if not self.initialized and loader_instance.status.get("valid"):
@@ -27,14 +28,26 @@ class RetrievalService:
             self.bm25 = BM25Retriever()
             self.hnsw = HNSWRetriever()
             
-            # Pre-index metadata dataframes for O(1) lookup
+            # Pre-build immutable dictionary for O(1) metadata lookup
             for lang in loader_instance.SUPPORTED_LANGUAGES:
                 df = loader_instance.get_metadata(lang)
                 if df is not None:
                     id_col = next((c for c in ["id", "doc_id", "passage_id"] if c in df.columns), df.columns[0])
-                    if df.index.name != id_col:
-                        df.set_index(id_col, inplace=True)
-                        df.index = df.index.astype(str)
+                    text_col = "text" if "text" in df.columns else "passage"
+                    lang_col = "lang" if "lang" in df.columns else ("language" if "language" in df.columns else None)
+                    
+                    id_idx = df.columns.get_loc(id_col)
+                    text_idx = df.columns.get_loc(text_col)
+                    lang_idx = df.columns.get_loc(lang_col) if lang_col else None
+                    
+                    lang_map = {}
+                    for row in df.itertuples(index=False):
+                        passage_id = str(row[id_idx])
+                        doc_text = row[text_idx]
+                        doc_lang = row[lang_idx] if lang_idx is not None else None
+                        lang_map[passage_id] = {"text": doc_text, "language": doc_lang}
+                        
+                    self.metadata_maps[lang] = lang_map
                         
             self.initialized = True
             logger.info("Retrieval service initialized. Running warmup query...")
@@ -81,7 +94,7 @@ class RetrievalService:
         breakdown["tokenization_ms"] = tok_ms
         breakdown["embedding_ms"] = emb_ms
         
-        fusion_k = max(60, top_k * 2)
+        fusion_k = max(40, top_k * 2)
         
         t1 = time.perf_counter()
         bm25_res = self.bm25.retrieve(processed_query, lang, top_k=fusion_k)
@@ -97,23 +110,17 @@ class RetrievalService:
         
         # 4. Metadata Lookup
         t4 = time.perf_counter()
-        df = loader_instance.get_metadata(lang)
-        id_col = next((c for c in ["id", "doc_id", "passage_id"] if c in df.columns), df.columns[0])
-        text_col = "text" if "text" in df.columns else "passage"
-        lang_col = "lang" if "lang" in df.columns else ("language" if "language" in df.columns else None)
+        lang_map = self.metadata_maps.get(lang, {})
         
         final_results = []
         for res in fused:
-            try:
-                row = df.loc[str(res["id"])]
-            except KeyError:
+            doc_id = str(res["id"])
+            if doc_id not in lang_map:
                 continue
                 
-            if isinstance(row, pd.DataFrame):
-                row = row.iloc[0]
-            
-            doc_text = row[text_col]
-            doc_lang = row[lang_col] if lang_col else None
+            entry = lang_map[doc_id]
+            doc_text = entry["text"]
+            doc_lang = entry["language"]
             
             source_str = "rrf(" + ",".join(res["sources"]) + ")"
             

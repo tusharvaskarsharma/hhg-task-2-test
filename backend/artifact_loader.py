@@ -766,8 +766,15 @@ class ArtifactLoader:
             onnx_path,
         )
 
+        sess_options = ort.SessionOptions()
+        if settings.ONNX_INTRA_THREADS > 0:
+            sess_options.intra_op_num_threads = settings.ONNX_INTRA_THREADS
+        if settings.ONNX_INTER_THREADS > 0:
+            sess_options.inter_op_num_threads = settings.ONNX_INTER_THREADS
+
         self.onnx_session = ort.InferenceSession(
             str(onnx_path),
+            sess_options=sess_options,
             providers=[
                 "CPUExecutionProvider"
             ],

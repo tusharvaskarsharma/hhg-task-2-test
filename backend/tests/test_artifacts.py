@@ -70,7 +70,7 @@ def test_artifact_loader_success(mock_artifact_dir, monkeypatch):
     import onnxruntime as ort
     
     class MockSession:
-        def __init__(self, path, providers=None):
+        def __init__(self, path, providers=None, **kwargs):
             pass
         def get_inputs(self):
             class MockInput:
@@ -98,7 +98,7 @@ def test_artifact_loader_success(mock_artifact_dir, monkeypatch):
 def test_artifact_loader_missing_manifest(mock_artifact_dir, monkeypatch):
     import onnxruntime as ort
     class MockSession:
-        def __init__(self, path, providers=None):
+        def __init__(self, path, providers=None, **kwargs):
             pass
         def get_inputs(self):
             class MockInput: name = "input"
