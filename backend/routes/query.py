@@ -159,6 +159,8 @@ async def query_endpoint(req: QueryRequest, request: Request, response: Response
             query=req.query,
             language=req.language,
             answer=final_answer,
+            extractive_answer=ext_answer if ext_decision == ExtractiveDecision.SUPPORTED else None,
+            generated_answer=gen_answer if req.generate else None,
             answer_source=answer_source,
             grounding=grounding_obj,
             results=ret_res["results"],

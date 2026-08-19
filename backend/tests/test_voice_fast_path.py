@@ -13,6 +13,10 @@ def test_client(monkeypatch):
     def mock_transcribe(audio_bytes, filename):
         return {"text": "what is the capital of india", "language": "en"}
     monkeypatch.setattr(stt_service, "transcribe", mock_transcribe)
+    
+    # Mock settings.SAARAS_ENABLED
+    from backend.config import settings
+    monkeypatch.setattr(settings, "SAARAS_ENABLED", True)
 
     # Mock Retrieval
     retrieval_service.initialized = True

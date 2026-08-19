@@ -8,6 +8,7 @@ from backend.pipeline.stt import stt_service, STTServiceError
 from backend.pipeline.retrieval_service import retrieval_service
 from backend.pipeline.generator import generator_service
 from backend.pipeline.extractive import build_extractive_answer, ExtractiveDecision
+from backend.config import settings
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -32,6 +33,10 @@ async def voice_endpoint(
     
     if not retrieval_service.initialized:
         err = APIErrorDetail(code="SERVICE_UNAVAILABLE", message="Backend not ready")
+        return Response(content=ErrorResponse(error=err).model_dump_json(), status_code=503, media_type="application/json")
+        
+    if not settings.SAARAS_ENABLED:
+        err = APIErrorDetail(code="STT_UNAVAILABLE", message="Speech-to-text service is disabled.")
         return Response(content=ErrorResponse(error=err).model_dump_json(), status_code=503, media_type="application/json")
         
     logger.info(f"ReqID: {req_id} | POST /api/voice | file: {audio.filename} | generate: {generate}")
@@ -183,6 +188,8 @@ async def voice_endpoint(
             query=transcript_text,
             language=final_lang,
             answer=final_answer,
+            extractive_answer=ext_answer if ext_decision == ExtractiveDecision.SUPPORTED else None,
+            generated_answer=gen_answer if generate else None,
             answer_source=answer_source,
             grounding=grounding_obj,
             results=ret_res["results"],

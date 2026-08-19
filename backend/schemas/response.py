@@ -40,6 +40,8 @@ class QueryResponse(BaseModel):
     query: str
     language: str
     answer: Optional[str] = Field(default=None, description="The best available answer (extractive or generated)")
+    extractive_answer: Optional[str] = Field(default=None, description="The extractive answer")
+    generated_answer: Optional[str] = Field(default=None, description="The generated answer")
     answer_source: Optional[str] = Field(
         default=None,
         description="How the answer was produced: 'extractive' | 'generated' | 'abstain' | 'generated-unavailable'",

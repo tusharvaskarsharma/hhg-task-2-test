@@ -9,7 +9,7 @@ import LoadingState from './components/LoadingState';
 import ErrorState from './components/ErrorState';
 import { useQuery } from './hooks/useQuery';
 import { useVoice } from './hooks/useVoice';
-import { checkHealth } from './api/query';
+import { checkHealth, checkReady } from './api/query';
 import { Sparkles } from 'lucide-react';
 import gsap from 'gsap';
 
@@ -17,22 +17,44 @@ const App = () => {
   const [sysStatus, setSysStatus] = useState(null);
   const [selectedLang, setSelectedLang] = useState('en');
   const [isGenerateEnabled, setIsGenerateEnabled] = useState(false);
+  const [sysError, setSysError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
   
   const textAPI = useQuery();
   const voiceAPI = useVoice();
 
   // Initialization
   useEffect(() => {
-    checkHealth()
-      .then(setSysStatus)
-      .catch(() => setSysStatus(null));
+    const init = async () => {
+      try {
+        const health = await checkHealth();
+        try {
+          await checkReady();
+          setSysStatus(health);
+          setSysError(null);
+        } catch (readyErr) {
+          if (readyErr.status === 503) {
+            setSysError("Backend is running but RAG artifacts are not ready");
+          } else {
+            setSysError("Backend error");
+          }
+        }
+      } catch (healthErr) {
+        if (healthErr.message.includes('Failed to fetch') || healthErr.message.includes('NetworkError')) {
+          setSysError("Backend is not running on port 8000");
+        } else {
+          setSysError("Backend error");
+        }
+      }
+    };
+    init();
       
     // GSAP Initial entrance
     gsap.fromTo('.gsap-stagger-item', 
       { opacity: 0, y: 30, rotateX: 10 },
       { opacity: 1, y: 0, rotateX: 0, duration: 0.8, stagger: 0.1, ease: 'power3.out' }
     );
-  }, []);
+  }, [retryCount]);
 
   const handleTextSubmit = (query, lang) => {
     voiceAPI.reset();
@@ -79,22 +101,17 @@ const App = () => {
           </div>
         </div>
 
-        {/* Generate Toggle */}
-        <div className="w-full mb-8 flex items-center justify-end space-x-3 gsap-stagger-item">
-          <span className="text-sm font-medium text-textMuted">
-            {isGenerateEnabled ? 'Grounded SLM mode' : 'Fast extractive mode'}
-          </span>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input 
-              type="checkbox" 
-              className="sr-only peer" 
-              checked={isGenerateEnabled}
-              onChange={(e) => setIsGenerateEnabled(e.target.checked)}
-              disabled={isBusy}
-            />
-            <div className="w-11 h-6 bg-surface peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-text after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-          </label>
-        </div>
+        {sysError && (
+          <div className="w-full mb-8 p-4 bg-error/10 border border-error/20 rounded-xl flex items-center justify-between gsap-stagger-item text-error">
+            <span className="font-medium text-sm">{sysError}</span>
+            <button 
+              onClick={() => setRetryCount(c => c + 1)}
+              className="px-3 py-1.5 bg-error/20 hover:bg-error/30 rounded-lg text-xs font-bold transition-colors"
+            >
+              Retry Connection
+            </button>
+          </div>
+        )}
 
         {/* Dynamic States */}
         <div className="w-full gsap-stagger-item perspective-1000">
@@ -124,10 +141,7 @@ const App = () => {
           {currentData && !isBusy && (
             <div className="flex flex-col w-full space-y-6">
               <AnswerPanel 
-                answer={currentData.answer} 
-                grounding={currentData.grounding}
-                transcription={currentData.transcription}
-                source={currentData.answer_source}
+                data={currentData}
               />
               <RetrievalPanel results={currentData.results} />
               <MetricsPanel latency={currentData.latency} cache={currentData.cache} />

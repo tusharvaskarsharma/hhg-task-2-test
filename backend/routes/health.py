@@ -9,8 +9,8 @@ router = APIRouter()
 @router.get("/api/health", summary="Legacy health check with full artifact status")
 def health_check(response: Response):
     is_valid = loader_instance.status.get("valid", False)
+    # Return 200 as long as the process is alive. Artifact state is handled by /api/ready.
     if not is_valid:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         return {
             "status": "error",
             "artifacts": loader_instance.status,

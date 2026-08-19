@@ -44,7 +44,8 @@ const VoiceInput = ({ state, onStart, onStop, disabled }) => {
         ref={buttonRef}
         onClick={isRecording ? onStop : onStart}
         disabled={disabled}
-        aria-label={isRecording ? "Stop recording" : "Start voice recording"}
+        aria-label={isRecording ? "Stop recording" : "Start voice query"}
+        title={isRecording ? "Stop recording" : "Ask by voice"}
         className={`relative z-10 w-14 h-14 rounded-full flex items-center justify-center transition-colors shadow-glass focus:outline-none focus:ring-4 ${
           isRecording 
             ? 'bg-error hover:bg-error/90 focus:ring-error/30' 

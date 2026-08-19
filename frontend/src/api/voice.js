@@ -2,7 +2,7 @@ import { fetchClient } from "./client";
 
 export const executeVoiceQuery = async (audioBlob, language, topK = 5, generate = false) => {
   const formData = new FormData();
-  formData.append("audio", audioBlob, "voice_record.webm");
+  formData.append("audio", audioBlob, audioBlob.name || "voice_record");
   
   if (language) {
     formData.append("language", language);
