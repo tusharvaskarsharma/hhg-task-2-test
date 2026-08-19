@@ -60,8 +60,8 @@ def test_saaras_error_propagation(mock_transcribe, monkeypatch):
     assert exc.value.status_code == 504
 
 def test_language_normalization():
-    assert stt_service._normalize_language("hi-IN") == "hi"
-    assert stt_service._normalize_language("en-US") == "en"
-    assert stt_service._normalize_language("bn-IN") == "bn"
-    assert stt_service._normalize_language("unknown") is None
-    assert stt_service._normalize_language(None) is None
+    from backend.pipeline.language import normalize_language
+    assert normalize_language("hi-IN") == "hi"
+    assert normalize_language("en-US") == "en"
+    assert normalize_language("bn") == "bn"
+    assert normalize_language("fr") is None

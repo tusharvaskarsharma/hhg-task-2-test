@@ -10,8 +10,8 @@ const MetricsPanel = ({ latency, cache }) => {
         
         {/* TOTAL CARD */}
         <div className="flex flex-col p-4 glass-panel hover:bg-surfaceHover transition-colors border-border/50 border-l-4 border-l-primary relative">
-          <div className="text-[10px] uppercase font-bold tracking-wider text-textMuted mb-1">TOTAL</div>
-          <div className="text-xs text-textMuted/70 mb-3">STT + RAG + SLM</div>
+          <div className="text-[10px] uppercase font-bold tracking-wider text-textMuted mb-1">TOTAL LATENCY</div>
+          <div className="text-xs text-textMuted/70 mb-3">Total request duration (STT + RAG + SLM)</div>
           <div className="flex items-baseline space-x-1 mt-auto">
             <span className="text-2xl font-mono font-bold text-primary">
               {latency.total_ms !== undefined ? latency.total_ms.toFixed(2) : '--'}
@@ -23,8 +23,8 @@ const MetricsPanel = ({ latency, cache }) => {
 
         {/* PARTIAL CARD */}
         <div className="flex flex-col p-4 glass-panel hover:bg-surfaceHover transition-colors border-border/50 border-l-4 border-l-secondary relative">
-          <div className="text-[10px] uppercase font-bold tracking-wider text-textMuted mb-1">PARTIAL</div>
-          <div className="text-xs text-textMuted/70 mb-3">RAG + SLM</div>
+          <div className="text-[10px] uppercase font-bold tracking-wider text-textMuted mb-1">PARTIAL LATENCY</div>
+          <div className="text-xs text-textMuted/70 mb-3">RAG + SLM (Excludes STT)</div>
           <div className="flex items-baseline space-x-1 mt-auto">
             <span className="text-2xl font-mono font-bold text-text">
               {latency.partial_ms !== undefined ? latency.partial_ms.toFixed(2) : '--'}

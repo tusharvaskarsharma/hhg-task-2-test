@@ -15,7 +15,7 @@ import gsap from 'gsap';
 
 const App = () => {
   const [sysStatus, setSysStatus] = useState(null);
-  const [selectedLang, setSelectedLang] = useState('en');
+  const [selectedLang, setSelectedLang] = useState('auto');
   const [isGenerateEnabled, setIsGenerateEnabled] = useState(false);
   const [sysError, setSysError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -99,6 +99,25 @@ const App = () => {
               disabled={textAPI.loading}
             />
           </div>
+        </div>
+
+        {/* Generated Mode Toggle */}
+        <div className="w-full mb-8 flex items-center justify-end px-2 gsap-stagger-item">
+          <label className="flex items-center space-x-3 cursor-pointer group">
+            <span className="text-sm font-medium text-textMuted group-hover:text-text transition-colors">
+              Generate grounded answer (SLM)
+            </span>
+            <div className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${isGenerateEnabled ? 'bg-primary' : 'bg-surface border border-border'}`}>
+              <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform duration-300 ${isGenerateEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+            </div>
+            <input 
+              type="checkbox" 
+              className="hidden" 
+              checked={isGenerateEnabled} 
+              onChange={(e) => setIsGenerateEnabled(e.target.checked)}
+              disabled={isBusy}
+            />
+          </label>
         </div>
 
         {sysError && (

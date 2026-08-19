@@ -1,17 +1,22 @@
 import { fetchClient } from "./client";
 
 export const executeQuery = async (queryText, language, topK = 5, generate = false) => {
+  const payload = {
+    query: queryText,
+    top_k: topK,
+    generate: generate
+  };
+
+  if (language && language !== 'auto') {
+    payload.language = language;
+  }
+
   return await fetchClient("/api/query", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      query: queryText,
-      language: language,
-      top_k: topK,
-      generate: generate
-    }),
+    body: JSON.stringify(payload),
   });
 };
 

@@ -50,7 +50,7 @@ class QueryResponse(BaseModel):
     results: List[RetrievalResult] = Field(description="List of ranked retrieval results")
     cache: dict = Field(default={"hit": False}, description="Metadata indicating cache status")
     latency: LatencyMetrics = Field(default_factory=LatencyMetrics, description="Latency metadata in milliseconds")
-    transcription: Optional[dict] = Field(default=None, description="STT transcription metadata if voice was used")
+    transcription: Optional[dict] = Field(default=None, description="STT transcription metadata if voice was used. Should contain text, detected_language, and language_source")
     
     # Extended fields for strict Task 5 schema alignment
     sources: Optional[List[dict]] = Field(default=None, description="List of source citations")
