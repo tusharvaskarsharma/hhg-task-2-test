@@ -1,13 +1,14 @@
 import { fetchClient } from "./client";
 
-export const executeVoiceQuery = async (audioBlob, language, topK = 5) => {
+export const executeVoiceQuery = async (audioBlob, language, topK = 5, generate = false) => {
   const formData = new FormData();
-  formData.append("audio", audioBlob, "voice_record.webm");
+  formData.append("audio", audioBlob, audioBlob.name || "voice_record");
   
   if (language) {
     formData.append("language", language);
   }
   formData.append("top_k", topK);
+  formData.append("generate", generate);
 
   return await fetchClient("/api/voice", {
     method: "POST",

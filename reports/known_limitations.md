@@ -2,20 +2,20 @@
 
 Generated: 2026-08-19
 
-## 1. RAG Accuracy is NOT Proven
-The system currently relies on self-retrieval (querying the exact text of a passage) for validation. A true evaluation requires independent queries mapped to gold-standard passages from the same corpus.
-- **Impact:** We cannot guarantee the system retrieves the best answer for real-world questions.
-- **Mitigation needed:** Generate a same-corpus ground-truth dataset (`query` -> `gold_passage_ids`) and evaluate using `Recall@K`.
+## 1. RAG Accuracy Benchmark Dependency
+The official accuracy evaluation (`run_accuracy_benchmark.py`) requires a precise `ground_truth.json` mapping production artifact IDs to queries. 
+- **Impact:** Without this file, the benchmark cannot verify accuracy against the loaded `hhg_rag_artifacts` corpus and will output `NOT RUN`.
+- **Status:** Mitigated by strict `NOT RUN` fallback.
 
 ## 2. TOTAL Latency Benchmark Blocked
 The Sarvam STT API rate-limits aggressively (~15-20 requests/minute), causing `429 Too Many Requests` during the 100-query benchmark.
-- **Impact:** We cannot prove the end-to-end (STT + RAG + SLM) latency is within SLA under load.
-- **Mitigation needed:** Implement request throttling (`--delay` parameter) in the benchmark script, or switch to a higher-capacity STT provider.
+- **Impact:** We cannot prove the end-to-end (STT + RAG + SLM) latency is within SLA under load without throttling.
+- **Status:** Mitigated by `--delay` parameter in `run_final_benchmark.py`.
 
 ## 3. Grounding Validation is Heuristic
-The current grounding validation uses a simple word-overlap heuristic (`difflib` with a 0.3 threshold).
-- **Impact:** It may falsely accept hallucinations that reuse words in different contexts, or falsely reject valid paraphrases.
-- **Mitigation needed:** Implement an NLI (Natural Language Inference) model or an LLM-as-a-judge for robust grounding validation.
+The current grounding validation uses a simple word-overlap heuristic (`difflib` with a 0.3 threshold) for generation evaluation during extraction.
+- **Impact:** It may falsely accept hallucinations that reuse words in different contexts.
+- **Mitigation needed:** Implement an NLI (Natural Language Inference) model or an LLM-as-a-judge for robust real-time grounding validation.
 
 ## 4. Extractive Path is Rigid
 The extractive fast-path uses deterministic sentence boundary detection and token overlap scoring.

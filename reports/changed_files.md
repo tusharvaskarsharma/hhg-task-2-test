@@ -1,19 +1,23 @@
 # HHG Changed Files Report
 
-Generated: 2026-08-19 (commit: 8332784 → HEAD)
+Generated: 2026-08-19 (commit: b5dad0db5d577f66b874cf8d88a0ccd57565de9f → HEAD)
 
 ## Files Modified
 
 | File | Reason |
 |------|--------|
-| `backend/config.py` | Phase 2: Added `parse_bool()`, fixed `HHG_HNSW_EF_SEARCH` prefix, added `ONNX_INTRA_THREADS`/`ONNX_INTER_THREADS` |
+| `backend/config.py` | Phase 2: Added `parse_bool()`, fixed `HHG_HNSW_EF_SEARCH` prefix, added SLM defaults |
 | `backend/schemas/query.py` | Phase 5: Added `generate: bool = False` field — makes SLM opt-in |
 | `backend/schemas/response.py` | Phase 5/6: Added `answer_source` field to `QueryResponse`, `extractive_ms` to `LatencyBreakdown`, `id` property to `RetrievalResult` |
 | `backend/pipeline/generator.py` | Phase 6: Added `GroundingDecision` enum, fixed `_validate_answer` return type, added `answer_source` field |
 | `backend/routes/query.py` | Phase 5: Rewrote to use extractive fast path by default; SLM only called when `generate=True` |
 | `backend/routes/health.py` | Phase 12: Added `/health` (liveness) and `/ready` (readiness) endpoints |
-| `backend/scripts/validate_artifacts.py` | Phase 12: Rewritten to output machine-readable JSON, per-language checks, `--json` flag |
-| `backend/.env` | Fix: Updated `HHG_SLM_MODEL` from decommissioned `mixtral-8x7b-32768` to `qwen/qwen3.6-27b` |
+| `backend/scripts/validate_artifacts.py` | Phase 3/12: Deep artifact validation for metadata uniqueness, HNSW counts, BM25 counts, missing manifests. |
+| `backend/scripts/run_accuracy_benchmark.py` | Phase 4: Strict accuracy benchmark falling back gracefully when `ground_truth.json` is missing. |
+| `run_final_benchmark.py` | Phase 5: Added latency gates (P50/P95/P99 <= 50ms) to fail tests if violated. |
+| `backend/.env.example` | Phase 2: Added strict Groq llama-3.1-8b-instant constants. |
+| `backend/tests/test_artifacts.py` | Phase 3: Added tests for validation scripts missing manifests and duplicate IDs. |
+| `backend/tests/test_rag_only_latency_contract.py` | Phase 1: Fixed incorrect response JSON parsing, enforced 0 mock calls to generators. |
 
 ## Files Created
 
@@ -22,6 +26,8 @@ Generated: 2026-08-19 (commit: 8332784 → HEAD)
 | `backend/pipeline/extractive.py` | Phase 5: New deterministic extractive fast-path module (no SLM) |
 | `backend/tests/test_extractive.py` | Phase 5: Tests for extractive module |
 | `backend/tests/test_health.py` | Phase 12: Tests for /health and /ready endpoints |
+| `backend/tests/test_benchmark_gates.py` | Phase 5: Ensure strict benchmark gating. |
+| `backend/tests/test_slm_client_payload.py` | Phase 2: Ensure strictly compliant payload (temp/tokens/model) sent to SLM endpoint. |
 | `reports/baseline_environment.json` | Phase 0 deliverable |
 | `reports/artifact_validation.json` | Phase 12 deliverable |
 | `reports/latency_report.md` | Phase 10 deliverable |

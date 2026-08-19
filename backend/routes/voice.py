@@ -8,6 +8,7 @@ from backend.pipeline.stt import stt_service, STTServiceError
 from backend.pipeline.retrieval_service import retrieval_service
 from backend.pipeline.generator import generator_service
 from backend.pipeline.extractive import build_extractive_answer, ExtractiveDecision
+from backend.config import settings
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -34,14 +35,41 @@ async def voice_endpoint(
         err = APIErrorDetail(code="SERVICE_UNAVAILABLE", message="Backend not ready")
         return Response(content=ErrorResponse(error=err).model_dump_json(), status_code=503, media_type="application/json")
         
+    if not settings.SAARAS_ENABLED:
+        err = APIErrorDetail(code="STT_UNAVAILABLE", message="Speech-to-text service is disabled.")
+        return Response(content=ErrorResponse(error=err).model_dump_json(), status_code=503, media_type="application/json")
+        
     logger.info(f"ReqID: {req_id} | POST /api/voice | file: {audio.filename} | generate: {generate}")
     
     start_time = time.perf_counter()
     
     try:
-        # 1. Read Audio
+        # 1. Read Audio and Validate
         audio_bytes = await audio.read()
         await audio.close()
+        
+        # Validation
+        valid_magic_bytes = [
+            b'OggS', # Ogg
+            b'RIFF', # Wav
+            b'ID3',  # MP3
+            b'\x1a\x45\xdf\xa3', # WebM/MKV
+            b'fLaC', # FLAC
+            b'0&\xb2u\x8ef\xcf\x11' # WMA (ASF)
+        ]
+        
+        is_audio = False
+        for magic in valid_magic_bytes:
+            if audio_bytes.startswith(magic):
+                is_audio = True
+                break
+                
+        # Also check content type loosely
+        is_valid_mime = audio.content_type and (audio.content_type.startswith('audio/') or audio.content_type in ['video/webm', 'video/ogg'])
+        
+        if not (is_audio or is_valid_mime):
+            err = APIErrorDetail(code="INVALID_AUDIO", message="Invalid audio file format")
+            return Response(content=ErrorResponse(error=err).model_dump_json(), status_code=400, media_type="application/json")
         
         # 2. Transcribe
         stt_start = time.perf_counter()
@@ -83,7 +111,12 @@ async def voice_endpoint(
                 grounding_obj = gen_grounding
             else:
                 final_answer = ext_answer
-                answer_source = "extractive"
+                
+                if answer_source == "generated-unavailable" and ext_decision != ExtractiveDecision.SUPPORTED:
+                    pass # keep generated-unavailable
+                else:
+                    answer_source = "extractive" if ext_decision == ExtractiveDecision.SUPPORTED else "abstain"
+                    
                 grounding_obj = {
                     "enabled": True,
                     "grounded": ext_decision == ExtractiveDecision.SUPPORTED,
@@ -155,6 +188,8 @@ async def voice_endpoint(
             query=transcript_text,
             language=final_lang,
             answer=final_answer,
+            extractive_answer=ext_answer if ext_decision == ExtractiveDecision.SUPPORTED else None,
+            generated_answer=gen_answer if generate else None,
             answer_source=answer_source,
             grounding=grounding_obj,
             results=ret_res["results"],

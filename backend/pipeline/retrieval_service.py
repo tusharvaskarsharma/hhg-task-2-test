@@ -9,6 +9,7 @@ from backend.pipeline.fusion import rrf_fuse
 from backend.pipeline.query_cache import cache_instance
 from backend.schemas.response import RetrievalResult
 from backend.artifact_loader import loader_instance
+from backend.config import settings
 import logging
 import pandas as pd
 logger = logging.getLogger(__name__)
@@ -113,6 +114,9 @@ class RetrievalService:
         lang_map = self.metadata_maps.get(lang, {})
         
         final_results = []
+        filtered_by_language_count = 0
+        require_lang_match = settings.EXTRACTIVE_REQUIRE_LANGUAGE_MATCH
+        
         for res in fused:
             doc_id = str(res["id"])
             if doc_id not in lang_map:
@@ -121,6 +125,10 @@ class RetrievalService:
             entry = lang_map[doc_id]
             doc_text = entry["text"]
             doc_lang = entry["language"]
+            
+            if require_lang_match and doc_lang and doc_lang != lang:
+                filtered_by_language_count += 1
+                continue
             
             source_str = "rrf(" + ",".join(res["sources"]) + ")"
             
@@ -146,7 +154,8 @@ class RetrievalService:
             "results": final_results,
             "cache": {"hit": False},
             "latency_breakdown": breakdown,
-            "rag_only_base_ms": total_ms
+            "rag_only_base_ms": total_ms,
+            "filtered_by_language": filtered_by_language_count
         }
 
 # Singleton instance

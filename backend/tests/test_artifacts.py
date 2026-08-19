@@ -30,7 +30,7 @@ def mock_artifact_dir(tmp_path, monkeypatch):
             "metadata.parquet": "dummy"
         }
     }
-    with open(artifact_dir / "manifest.json", "w", encoding="utf-8") as f:
+    with open(artifact_dir / "build_manifest.json", "w", encoding="utf-8") as f:
         json.dump(manifest_data, f)
         
     # Create bm25
@@ -50,7 +50,7 @@ def mock_artifact_dir(tmp_path, monkeypatch):
     metadata_dir = artifact_dir / "metadata"
     metadata_dir.mkdir()
     df = pd.DataFrame({"id": ["1"], "text": ["hello"], "lang": ["hi"]})
-    df.to_parquet(metadata_dir / "metadata.parquet")
+    df.to_parquet(metadata_dir / "passage_metadata.parquet")
     
     # Create model
     model_dir = artifact_dir / "model"
@@ -110,11 +110,38 @@ def test_artifact_loader_missing_manifest(mock_artifact_dir, monkeypatch):
             return [MockOutput()]
     monkeypatch.setattr(ort, "InferenceSession", MockSession)
 
-    os.remove(mock_artifact_dir / "manifest.json")
+    os.remove(mock_artifact_dir / "build_manifest.json")
     loader = ArtifactLoader()
     loader.initialize()
     assert loader.status["valid"] is False
     assert any("Manifest not found" in e for e in loader.errors)
+
+def test_validate_artifacts_missing_dir():
+    from backend.scripts.validate_artifacts import validate
+    res = validate("/invalid/path")
+    assert "ARTIFACT_ROOT_MISSING" in res["overall_status"]
+
+def test_validate_artifacts_missing_manifest(mock_artifact_dir):
+    from backend.scripts.validate_artifacts import validate
+    os.remove(mock_artifact_dir / "build_manifest.json")
+    res = validate(str(mock_artifact_dir))
+    assert res["overall_status"] == "FAIL"
+
+def test_validate_artifacts_empty_text(mock_artifact_dir):
+    from backend.scripts.validate_artifacts import validate
+    df = pd.DataFrame({"id": ["1"], "text": [""], "lang": ["hi"]})
+    df.to_parquet(mock_artifact_dir / "metadata" / "passage_metadata.parquet")
+    res = validate(str(mock_artifact_dir))
+    assert res["overall_status"] == "FAIL", f"res: {res}"
+    assert any("empty or null" in e for e in res["errors"]), f"res: {res}"
+
+def test_validate_artifacts_duplicate_ids(mock_artifact_dir):
+    from backend.scripts.validate_artifacts import validate
+    df = pd.DataFrame({"id": ["1", "1"], "text": ["a", "b"], "lang": ["hi", "hi"]})
+    df.to_parquet(mock_artifact_dir / "metadata" / "passage_metadata.parquet")
+    res = validate(str(mock_artifact_dir))
+    assert res["overall_status"] == "FAIL", f"res: {res}"
+    assert any("not unique" in e for e in res["errors"]), f"res: {res}"
 
 
 

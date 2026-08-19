@@ -1,6 +1,6 @@
 import { fetchClient } from "./client";
 
-export const executeQuery = async (queryText, language, topK = 5) => {
+export const executeQuery = async (queryText, language, topK = 5, generate = false) => {
   return await fetchClient("/api/query", {
     method: "POST",
     headers: {
@@ -9,7 +9,8 @@ export const executeQuery = async (queryText, language, topK = 5) => {
     body: JSON.stringify({
       query: queryText,
       language: language,
-      top_k: topK
+      top_k: topK,
+      generate: generate
     }),
   });
 };

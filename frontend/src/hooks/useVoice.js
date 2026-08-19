@@ -36,7 +36,7 @@ export const useVoice = () => {
     }
   };
 
-  const stopRecordingAndSubmit = (language) => {
+  const stopRecordingAndSubmit = (language, topK = 5, generate = false) => {
     return new Promise((resolve, reject) => {
       const mediaRecorder = mediaRecorderRef.current;
       if (!mediaRecorder || mediaRecorder.state === 'inactive') return resolve();
@@ -60,7 +60,7 @@ export const useVoice = () => {
         console.log("VOICE API REQUEST");
         setState('PROCESSING');
         try {
-          const response = await executeVoiceQuery(audioBlob, language);
+          const response = await executeVoiceQuery(audioBlob, language, topK, generate);
           setData(response);
           setState('SUCCESS');
           resolve(response);
