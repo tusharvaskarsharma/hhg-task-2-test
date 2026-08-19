@@ -1,5 +1,6 @@
 import time
 import logging
+import re
 from typing import List
 from backend.schemas.response import RetrievalResult
 from backend.pipeline.slm_client import slm_client, SLMClientError
@@ -9,6 +10,22 @@ from backend.config import settings
 logger = logging.getLogger(__name__)
 
 class GeneratorService:
+    def _clean_slm_output(self, answer: str) -> str:
+        """
+        Removes internal reasoning output (<think>...</think>) from the model's response.
+        """
+        # Remove complete <think>...</think> blocks
+        cleaned = re.sub(r"<think>.*?</think>", "", answer, flags=re.DOTALL)
+        
+        # Remove anything before </think> if the model didn't output the opening tag
+        if "</think>" in cleaned:
+            cleaned = cleaned.split("</think>")[-1]
+            
+        # Remove unclosed <think> blocks at the end
+        cleaned = re.sub(r"<think>.*$", "", cleaned, flags=re.DOTALL)
+        
+        return cleaned.strip()
+
     def _build_prompt(self, query: str, context: str) -> str:
         """
         Builds a strict injection-safe prompt commanding groundedness.
@@ -126,7 +143,10 @@ class GeneratorService:
         # 2. SLM Generation
         t1 = time.perf_counter()
         try:
-            answer = slm_client.generate(prompt)
+            raw_answer = slm_client.generate(prompt)
+            answer = self._clean_slm_output(raw_answer)
+            if not answer:
+                answer = "I don't have enough information in the retrieved sources to answer this question."
         except SLMClientError as e:
             logger.error(f"SLM Generation Failed: {str(e)}")
             answer = "I'm sorry, the generation service is currently unavailable."

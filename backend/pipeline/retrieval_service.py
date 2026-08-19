@@ -37,7 +37,13 @@ class RetrievalService:
                         df.index = df.index.astype(str)
                         
             self.initialized = True
-            logger.info("Retrieval service initialized.")
+            logger.info("Retrieval service initialized. Running warmup query...")
+            try:
+                # Force lazy initialization (AutoTokenizer, ONNX, pandas index)
+                self.execute_query("warmup", "hi", 1)
+                logger.info("Warmup query completed successfully.")
+            except Exception as e:
+                logger.warning(f"Warmup query failed (non-fatal): {e}")
 
     def execute_query(self, query: str, language: str, top_k: int) -> dict:
         start_time = time.perf_counter()
