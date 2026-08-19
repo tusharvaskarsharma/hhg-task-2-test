@@ -7,6 +7,7 @@ from backend.schemas.response import QueryResponse, ErrorResponse, APIErrorDetai
 from backend.pipeline.retrieval_service import retrieval_service
 from backend.pipeline.generator import generator_service
 from backend.pipeline.extractive import build_extractive_answer, ExtractiveDecision
+from backend.pipeline.language import normalize_language, detect_text_language
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -31,15 +32,23 @@ async def query_endpoint(req: QueryRequest, request: Request, response: Response
             media_type="application/json",
         )
 
+    # ── Language Detection ──────────────────────────────────────────────────
+    user_lang = normalize_language(req.language)
+    if user_lang:
+        final_lang = user_lang
+    else:
+        detected = detect_text_language(req.query)
+        final_lang = detected or "hi"
+
     logger.info(
-        f"ReqID: {req_id} | POST /api/query | lang: {req.language} | top_k: {req.top_k} | generate: {req.generate}"
+        f"ReqID: {req_id} | POST /api/query | lang_req: {req.language} | final_lang: {final_lang} | top_k: {req.top_k} | generate: {req.generate}"
     )
 
     try:
         start_time = time.perf_counter()
 
         # ── Retrieval ──────────────────────────────────────────────────────
-        ret_res = retrieval_service.execute_query(req.query, req.language, req.top_k)
+        ret_res = retrieval_service.execute_query(req.query, final_lang, req.top_k)
         retrieval_done_ms = (time.perf_counter() - start_time) * 1000.0
 
         bd = ret_res["latency_breakdown"]
@@ -58,7 +67,7 @@ async def query_endpoint(req: QueryRequest, request: Request, response: Response
         grounding_validation_ms = 0.0
 
         if req.generate:
-            gen_res = generator_service.generate(req.query, req.language, ret_res["results"])
+            gen_res = generator_service.generate(req.query, final_lang, ret_res["results"])
             gen_answer = gen_res.get("answer")
             answer_source = gen_res.get("answer_source", "generated")
             gen_grounding = gen_res.get("grounding", {})
@@ -115,7 +124,7 @@ async def query_endpoint(req: QueryRequest, request: Request, response: Response
         total_latency_ms = (time.perf_counter() - start_time) * 1000.0
 
         logger.info(
-            f"ReqID: {req_id} | Success | lang: {req.language} | "
+            f"ReqID: {req_id} | Success | lang: {final_lang} | "
             f"cache_hit: {ret_res['cache']['hit']} | answer_source: {answer_source} | "
             f"total_ms: {total_latency_ms:.2f}"
         )
@@ -157,7 +166,7 @@ async def query_endpoint(req: QueryRequest, request: Request, response: Response
         t_pre_ser = time.perf_counter()
         resp = QueryResponse(
             query=req.query,
-            language=req.language,
+            language=final_lang,
             answer=final_answer,
             extractive_answer=ext_answer if ext_decision == ExtractiveDecision.SUPPORTED else None,
             generated_answer=gen_answer if req.generate else None,

@@ -8,6 +8,7 @@ from backend.pipeline.stt import stt_service, STTServiceError
 from backend.pipeline.retrieval_service import retrieval_service
 from backend.pipeline.generator import generator_service
 from backend.pipeline.extractive import build_extractive_answer, ExtractiveDecision
+from backend.pipeline.language import normalize_language
 from backend.config import settings
 
 router = APIRouter()
@@ -36,7 +37,7 @@ async def voice_endpoint(
         return Response(content=ErrorResponse(error=err).model_dump_json(), status_code=503, media_type="application/json")
         
     if not settings.SAARAS_ENABLED:
-        err = APIErrorDetail(code="STT_UNAVAILABLE", message="Speech-to-text service is disabled.")
+        err = APIErrorDetail(code="STT_FAILURE", message="Speech-to-text service is disabled.")
         return Response(content=ErrorResponse(error=err).model_dump_json(), status_code=503, media_type="application/json")
         
     logger.info(f"ReqID: {req_id} | POST /api/voice | file: {audio.filename} | generate: {generate}")
@@ -79,7 +80,25 @@ async def voice_endpoint(
         transcript_text = stt_res["text"]
         
         # 3. Resolve Language (Form override takes precedence over STT detection)
-        final_lang = language or stt_res.get("language") or "hi"
+        user_lang = normalize_language(language)
+        stt_lang = normalize_language(stt_res.get("language"))
+        
+        if user_lang:
+            final_lang = user_lang
+            lang_source = "user_override"
+        elif stt_lang:
+            final_lang = stt_lang
+            lang_source = "stt"
+        else:
+            final_lang = "hi"
+            lang_source = "fallback"
+            
+        transcription_obj = {
+            "text": transcript_text,
+            "detected_language": final_lang,
+            "language_source": lang_source,
+            "confidence": 0.0
+        }
         
         # 4. Retrieval
         ret_res = retrieval_service.execute_query(transcript_text, final_lang, top_k)
@@ -200,10 +219,7 @@ async def voice_endpoint(
                 "rag_only_ms": 0.0,
                 "breakdown": breakdown_dict
             },
-            transcription={
-                "text": transcript_text,
-                "detected_language": stt_res.get("language")
-            },
+            transcription=transcription_obj,
             sources=grounding_obj.get("sources", []),
             retrieval=retrieval_obj,
             metrics={

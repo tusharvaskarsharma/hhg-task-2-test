@@ -23,6 +23,7 @@ const QueryInput = ({ onSubmit, disabled, selectedLang, setSelectedLang }) => {
             disabled={disabled}
             className="appearance-none bg-transparent text-sm font-medium text-text pl-9 pr-6 py-3 border-r border-border focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-l-xl cursor-pointer"
           >
+            <option value="auto">Auto (Detect)</option>
             {languages.map(l => (
               <option key={l.code} value={l.code} className="bg-background">
                 {l.name}

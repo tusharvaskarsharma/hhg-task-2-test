@@ -4,6 +4,7 @@ import os
 import subprocess
 from backend.config import settings
 from backend.pipeline.saaras_client import transcribe_audio, SaarasAPIError
+from backend.pipeline.language import normalize_language
 
 logger = logging.getLogger(__name__)
 
@@ -55,21 +56,7 @@ class STTService:
         if ext and ext not in self.supported_extensions:
             logger.warning(f"Audio extension {ext} not explicitly in supported list, but passing through to Saaras.")
             
-    def _normalize_language(self, saaras_lang_code: str) -> str:
-        """
-        Maps Saaras BCP-47 language codes (e.g. 'hi-IN') to our internal supported list.
-        """
-        if not saaras_lang_code:
-            return None
-            
-        code = saaras_lang_code.lower()
-        if code.startswith("hi"):
-            return "hi"
-        if code.startswith("en"):
-            return "en"
-        if code.startswith("bn"):
-            return "bn"
-        return None
+
 
     def transcribe(self, audio_bytes: bytes, filename: str) -> dict:
         """
@@ -95,7 +82,7 @@ class STTService:
             raise STTServiceError("Transcription resulted in empty text.", status_code=400)
             
         raw_lang = res.get("language_code")
-        lang = self._normalize_language(raw_lang)
+        lang = normalize_language(raw_lang)
         
         return {
             "text": text,
