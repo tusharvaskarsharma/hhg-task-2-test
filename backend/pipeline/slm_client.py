@@ -19,6 +19,20 @@ class SLMClient:
         self.timeout = settings.SLM_TIMEOUT_SECONDS
         self.max_tokens = settings.SLM_MAX_TOKENS
         self.temperature = settings.SLM_TEMPERATURE
+        
+        # Configure session with retries
+        from requests.adapters import HTTPAdapter
+        from urllib3.util.retry import Retry
+        self.session = requests.Session()
+        retries = Retry(
+            total=3,
+            backoff_factor=0.5,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["POST"]
+        )
+        adapter = HTTPAdapter(max_retries=retries)
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
 
     def generate(self, prompt: str) -> str:
         if not self.enabled:
@@ -38,7 +52,7 @@ class SLMClient:
         }
         
         try:
-            response = requests.post(
+            response = self.session.post(
                 self.base_url,
                 json=payload,
                 headers=headers,

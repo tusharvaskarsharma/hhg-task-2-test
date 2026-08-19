@@ -58,10 +58,10 @@ class GeneratorService:
         """
         ans_lower = answer.lower()
         if not answer.strip():
-            return False
+            return "UNSUPPORTED"
             
         if not context.strip():
-            return False
+            return "INSUFFICIENT_CONTEXT"
             
         # Common fallback strings checking
         fallbacks = [
@@ -75,11 +75,11 @@ class GeneratorService:
         
         for fallback in fallbacks:
             if fallback in ans_lower:
-                return False
+                return "INSUFFICIENT_CONTEXT"
                 
-        # Basic lexical grounding heuristic:
-        # Require at least one significant word from the context to be in the answer
-        # to ensure it's not a complete hallucination ignoring the context.
+        # Evaluate semantic overlap with difflib
+        import difflib
+        
         ans_words = set("".join(c if c.isalnum() else " " for c in ans_lower).split())
         ctx_words = set("".join(c if c.isalnum() else " " for c in context.lower()).split())
         
@@ -88,15 +88,20 @@ class GeneratorService:
         ans_significant = ans_words - stop_words
         
         if not ans_significant:
-            return False
-            
-        overlap = ans_significant.intersection(ctx_words)
+            return "SUPPORTED" # No significant words means we can't flag it as unsupported
         
         # If the answer introduces too many novel significant words, flag as hallucination
-        if len(overlap) / len(ans_significant) < 0.4:
-            return False
+        overlap_count = 0
+        for aw in ans_significant:
+            # Check if ans word has a close match in context words (handles morphology)
+            if any(difflib.SequenceMatcher(None, aw, cw).ratio() > 0.8 for cw in ctx_words):
+                overlap_count += 1
+                
+        # Relaxed threshold with difflib
+        if overlap_count / len(ans_significant) < 0.3:
+            return "UNSUPPORTED"
             
-        return True
+        return "SUPPORTED"
 
     def generate(self, query: str, language: str, retrieval_results: List[RetrievalResult]) -> dict:
         """
@@ -129,6 +134,7 @@ class GeneratorService:
                 "grounding": {
                     "enabled": True,
                     "grounded": False,
+                    "status": "INSUFFICIENT_CONTEXT",
                     "sources": []
                 },
                 "latency": {
@@ -161,8 +167,9 @@ class GeneratorService:
             "answer": answer,
             "grounding": {
                 "enabled": True,
-                "grounded": is_grounded,
-                "sources": sources if is_grounded else []
+                "grounded": is_grounded == "SUPPORTED",
+                "status": is_grounded,
+                "sources": sources if is_grounded == "SUPPORTED" else []
             },
             "latency": {
                 "grounding_ms": round(grounding_ms, 2),

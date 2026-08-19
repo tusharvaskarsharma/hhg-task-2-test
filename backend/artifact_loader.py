@@ -468,10 +468,11 @@ class ArtifactLoader:
         if getattr(self, "shared_metadata_df", None) is not None:
             df = self.shared_metadata_df
             language_col = self._first_existing(df.columns, ("language", "lang"))
+            id_col = self._first_existing(df.columns, ("passage_id", "id", "doc_id", "chunk_id"))
             if language_col:
-                artifacts.metadata_df = df[df[language_col] == language].reset_index(drop=True)
+                artifacts.metadata_df = df[df[language_col] == language].reset_index(drop=True).set_index(id_col, drop=False)
             else:
-                artifacts.metadata_df = df
+                artifacts.metadata_df = df.set_index(id_col, drop=False)
             artifacts.status["metadata"] = True
             logger.info("Shared metadata reused for language=%s", language)
             return
@@ -486,64 +487,33 @@ class ArtifactLoader:
                 f"language={language}"
             )
 
+        import pyarrow.parquet as pq
+        schema = pq.read_schema(metadata_path)
+        all_cols = schema.names
+        
+        id_col = self._first_existing(all_cols, ("passage_id", "id", "doc_id", "chunk_id"))
+        text_col = self._first_existing(all_cols, ("text", "passage", "content", "english_text"))
+        language_col = self._first_existing(all_cols, ("language", "lang"))
+
+        if id_col is None:
+            raise ValueError(f"{language}: metadata has no ID column.")
+        if text_col is None:
+            raise ValueError(f"{language}: metadata has no text column.")
+
+        cols_to_load = [id_col, text_col]
+        if language_col:
+            cols_to_load.append(language_col)
+
+        # Optimize memory usage by loading only required columns
         df = pd.read_parquet(
-            metadata_path
+            metadata_path,
+            columns=cols_to_load
         )
 
         if df.empty:
             raise ValueError(
                 f"{language}: metadata is empty."
             )
-
-        # --------------------------------------------------------------
-        # Required identity field
-        # --------------------------------------------------------------
-
-        id_col = self._first_existing(
-            df.columns,
-            (
-                "passage_id",
-                "id",
-                "doc_id",
-                "chunk_id",
-            ),
-        )
-
-        if id_col is None:
-            raise ValueError(
-                f"{language}: metadata has no ID column."
-            )
-
-        # --------------------------------------------------------------
-        # Required text field
-        # --------------------------------------------------------------
-
-        text_col = self._first_existing(
-            df.columns,
-            (
-                "text",
-                "passage",
-                "content",
-                "english_text",
-            ),
-        )
-
-        if text_col is None:
-            raise ValueError(
-                f"{language}: metadata has no text column."
-            )
-
-        # --------------------------------------------------------------
-        # Language column
-        # --------------------------------------------------------------
-
-        language_col = self._first_existing(
-            df.columns,
-            (
-                "language",
-                "lang",
-            ),
-        )
 
         logger.info(
             "Metadata loaded: language=%s rows=%d id=%s text=%s",
@@ -561,9 +531,9 @@ class ArtifactLoader:
 
         self.shared_metadata_df = df
         if language_col:
-            artifacts.metadata_df = df[df[language_col] == language].reset_index(drop=True)
+            artifacts.metadata_df = df[df[language_col] == language].reset_index(drop=True).set_index(id_col, drop=False)
         else:
-            artifacts.metadata_df = df
+            artifacts.metadata_df = df.set_index(id_col, drop=False)
         artifacts.status["metadata"] = True
 
     # ------------------------------------------------------------------

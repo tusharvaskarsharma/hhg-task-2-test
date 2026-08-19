@@ -87,12 +87,37 @@ async def voice_endpoint(
         # PARTIAL calculation (everything except STT)
         partial_ms = total_latency_ms - stt_latency_ms
         
+        # Metrics requested in Task 5
+        metrics_obj = {
+            "cache_hit": ret_res['cache']['hit'],
+            "retrieval_latency_ms": round(ret_res["rag_only_base_ms"], 2),
+            "total_latency_ms": round(total_latency_ms, 2)
+        }
+        
+        # Retrieval breakdown requested in Task 5
+        def get_source(r):
+            return r.source if hasattr(r, 'source') else r.get('source', '')
+            
+        bm25_count = sum(1 for r in ret_res["results"] if "bm25" in get_source(r))
+        hnsw_count = sum(1 for r in ret_res["results"] if "hnsw" in get_source(r))
+        rrf_count = len(ret_res["results"])
+        
+        retrieval_obj = {
+            "bm25": bm25_count,
+            "hnsw": hnsw_count,
+            "rrf": rrf_count
+        }
+
+        # Validate format for grounding dict
+        grounding_obj = gen_res["grounding"].copy()
+        grounding_obj["validated"] = grounding_obj.get("grounded", False)
+
         t_pre_ser = time.perf_counter()
         resp = QueryResponse(
             query=transcript_text,
             language=final_lang,
             answer=gen_res["answer"],
-            grounding=gen_res["grounding"],
+            grounding=grounding_obj,
             results=ret_res["results"],
             cache=ret_res["cache"],
             latency={
@@ -104,7 +129,10 @@ async def voice_endpoint(
             transcription={
                 "text": transcript_text,
                 "detected_language": stt_res.get("language")
-            }
+            },
+            sources=grounding_obj.get("sources", []),
+            retrieval=retrieval_obj,
+            metrics=metrics_obj
         )
         
         # Mock serialization time for latency injection

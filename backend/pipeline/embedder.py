@@ -15,6 +15,9 @@ class Embedder:
     def __init__(self):
         self.session = loader_instance.onnx_session
         if AutoTokenizer is not None:
+            # Prevent 7-second network delay during cold start
+            import os
+            os.environ["HF_HUB_OFFLINE"] = "1"
             self.tokenizer = AutoTokenizer.from_pretrained("intfloat/multilingual-e5-small")
         else:
             self.tokenizer = None

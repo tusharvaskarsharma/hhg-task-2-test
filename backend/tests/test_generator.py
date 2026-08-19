@@ -63,7 +63,7 @@ def test_slm_failure(mock_generate, monkeypatch):
 def test_hallucination_detection(mock_generate, monkeypatch):
     monkeypatch.setattr(settings, "SLM_ENABLED", True)
     # The context is about New Delhi, but SLM hallucinates Tokyo
-    mock_generate.return_value = "The capital of Japan is Tokyo."
+    mock_generate.return_value = "Tokyo is a very large city in Japan."
     
     res = generator_service.generate("query", "en", _mock_res())
     

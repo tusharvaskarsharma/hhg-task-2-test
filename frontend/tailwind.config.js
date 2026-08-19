@@ -17,6 +17,7 @@ export default {
         textMuted: '#94a3b8',
         success: '#10b981',
         error: '#ef4444',
+        warning: '#f59e0b',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

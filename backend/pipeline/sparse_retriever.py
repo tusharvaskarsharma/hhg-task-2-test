@@ -22,7 +22,9 @@ class BM25Retriever:
                 import bm25s
                 # bm25s expects a list of queries
                 tokenized_queries = bm25s.tokenize([query])
-                results_idx, scores = bm25.retrieve(tokenized_queries, corpus=None, k=top_k)
+                if len(tokenized_queries.ids) == 0 or len(tokenized_queries.ids[0]) == 0:
+                    return []
+                results_idx, scores = bm25.retrieve(tuple(tokenized_queries), corpus=None, k=top_k)
                 top_k_indices = results_idx[0]
                 scores = scores[0]
             else:

@@ -45,17 +45,22 @@ const AnswerPanel = ({ answer, grounding, transcription }) => {
             </p>
           </div>
 
-          {isEnabled && (
+          {isEnabled && grounding?.status && (
             <div className="pt-4 mt-4 border-t border-border flex items-center">
-              {isGrounded ? (
+              {grounding.status === "SUPPORTED" ? (
                 <div className="flex items-center space-x-2 text-xs font-medium text-success bg-success/10 px-3 py-1.5 rounded-full border border-success/20">
                   <ShieldCheck className="w-4 h-4" />
                   <span>Answer grounded in corpus context</span>
                 </div>
+              ) : grounding.status === "INSUFFICIENT_CONTEXT" ? (
+                <div className="flex items-center space-x-2 text-xs font-medium text-warning bg-warning/10 px-3 py-1.5 rounded-full border border-warning/20">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>Insufficient context — answer restricted</span>
+                </div>
               ) : (
                 <div className="flex items-center space-x-2 text-xs font-medium text-error bg-error/10 px-3 py-1.5 rounded-full border border-error/20">
                   <AlertTriangle className="w-4 h-4" />
-                  <span>Insufficient context — answer restricted</span>
+                  <span>Answer is unsupported by context — may contain hallucinations</span>
                 </div>
               )}
             </div>

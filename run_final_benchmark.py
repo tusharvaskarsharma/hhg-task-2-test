@@ -215,6 +215,10 @@ def main():
     p2.wait()
     subprocess.run("taskkill /F /IM uvicorn.exe /T", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
+    if not rag_data:
+        print("RAG_ONLY benchmarking failed. Exiting.")
+        sys.exit(1)
+        
     rag_p50 = np.percentile(rag_data["total RAG_ONLY"], 50)
     rag_p95 = np.percentile(rag_data["total RAG_ONLY"], 95)
     
