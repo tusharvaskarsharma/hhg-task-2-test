@@ -9,6 +9,11 @@ class RetrievalResult(BaseModel):
     source: str
     language: Optional[str] = None
 
+    @property
+    def id(self) -> str:
+        """Alias for doc_id — used by extractive module."""
+        return self.doc_id
+
 class LatencyBreakdown(BaseModel):
     stt_ms: float = 0.0
     language_detection_ms: float = 0.0
@@ -19,6 +24,7 @@ class LatencyBreakdown(BaseModel):
     rrf_ms: float = 0.0
     metadata_ms: float = 0.0
     grounding_ms: float = 0.0
+    extractive_ms: float = 0.0
     slm_ms: float = 0.0
     generation_ms: float = 0.0
     validation_ms: float = 0.0
@@ -33,7 +39,11 @@ class LatencyMetrics(BaseModel):
 class QueryResponse(BaseModel):
     query: str
     language: str
-    answer: Optional[str] = Field(default=None, description="Generated answer from SLM")
+    answer: Optional[str] = Field(default=None, description="The best available answer (extractive or generated)")
+    answer_source: Optional[str] = Field(
+        default=None,
+        description="How the answer was produced: 'extractive' | 'generated' | 'abstain' | 'generated-unavailable'",
+    )
     grounding: dict = Field(default={"enabled": False, "grounded": False, "sources": []}, description="Grounding metadata and citations")
     results: List[RetrievalResult] = Field(description="List of ranked retrieval results")
     cache: dict = Field(default={"hit": False}, description="Metadata indicating cache status")
