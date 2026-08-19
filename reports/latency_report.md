@@ -1,63 +1,78 @@
-# HHG Latency Report
 
-## Environment
-- **Platform:** Windows-11-10.0.26200-SP0
-- **Python:** 3.13.14
-- **Commit:** b5dad0db5d577f66b874cf8d88a0ccd57565de9f
-- **Artifact manifest SHA256:** a7a071b88f6f6800
-- **Benchmark date:** 2026-08-19T21:02:28.950406Z
-
-## RAG_ONLY Tier
-Configuration: `slm_enabled=False`, `saaras_enabled=False`
-
-| stage | avg | p50 | p95 | p99 | min | max |
-|---|---|---|---|---|---|---|
-| language detection | 0.01 | 0.01 | 0.02 | 0.02 | 0.01 | 0.02 |
-| tokenization | 0.51 | 0.52 | 0.61 | 0.62 | 0.39 | 0.63 |
-| embedding | 12.38 | 11.47 | 16.60 | 17.93 | 10.82 | 18.27 |
-| BM25 | 0.94 | 0.92 | 1.15 | 1.22 | 0.75 | 1.24 |
-| HNSW | 0.12 | 0.11 | 0.15 | 0.16 | 0.11 | 0.16 |
-| RRF | 0.24 | 0.23 | 0.27 | 0.27 | 0.21 | 0.27 |
-| metadata lookup | 0.25 | 0.24 | 0.29 | 0.30 | 0.23 | 0.30 |
-| extractive | 0.14 | 0.13 | 0.16 | 0.16 | 0.10 | 0.16 |
-| serialization | 0.12 | 0.12 | 0.15 | 0.16 | 0.09 | 0.16 |
-| total_rag-only | 14.81 | 13.75 | 19.36 | 20.58 | 13.10 | 20.88 |
-
-## PARTIAL Tier
-Configuration: `slm_enabled=True`, `saaras_enabled=False`
+RAG_ONLY
+slm_enabled=false
+saaras_enabled=false
+cache_enabled=false
+requests=300
+warmups=100
+language=en
+p50_ms=14.91
+p95_ms=17.98
+p99_ms=23.58
+slm_calls=0
+status=PASS
 
 | stage | avg | p50 | p95 | p99 | min | max |
 |---|---|---|---|---|---|---|
-| language detection | 0.02 | 0.02 | 0.03 | 0.03 | 0.02 | 0.03 |
-| tokenization | 0.65 | 0.67 | 0.76 | 0.77 | 0.52 | 0.78 |
-| embedding | 12.28 | 11.76 | 13.46 | 13.61 | 11.45 | 13.65 |
-| BM25 | 0.99 | 0.99 | 1.01 | 1.01 | 0.96 | 1.01 |
-| HNSW | 0.12 | 0.12 | 0.13 | 0.13 | 0.11 | 0.13 |
-| RRF | 0.23 | 0.24 | 0.25 | 0.25 | 0.21 | 0.25 |
-| metadata lookup | 0.25 | 0.23 | 0.30 | 0.30 | 0.22 | 0.30 |
-| extractive | 0.23 | 0.24 | 0.26 | 0.26 | 0.18 | 0.26 |
-| serialization | 0.12 | 0.12 | 0.13 | 0.13 | 0.10 | 0.13 |
-| grounding | 0.01 | 0.01 | 0.01 | 0.01 | 0.01 | 0.01 |
-| generation | 3525.25 | 1901.98 | 7405.45 | 7894.65 | 656.83 | 8016.95 |
-| validation | 3.05 | 2.97 | 3.26 | 3.28 | 2.90 | 3.29 |
-| total_partial | 3543.37 | 1919.33 | 7424.85 | 7914.23 | 674.20 | 8036.58 |
+| language detection | 0.02 | 0.01 | 0.02 | 0.04 | 0.01 | 0.05 |
+| tokenization | 0.43 | 0.42 | 0.58 | 0.65 | 0.29 | 0.83 |
+| embedding | 13.20 | 12.74 | 15.93 | 21.64 | 9.38 | 61.69 |
+| BM25 | 0.95 | 0.94 | 1.23 | 1.37 | 0.68 | 1.52 |
+| HNSW | 0.09 | 0.09 | 0.12 | 0.14 | 0.06 | 0.27 |
+| RRF | 0.22 | 0.16 | 0.25 | 1.33 | 0.10 | 1.58 |
+| metadata lookup | 0.04 | 0.03 | 0.05 | 0.05 | 0.02 | 0.05 |
+| extractive | 0.15 | 0.15 | 0.19 | 0.21 | 0.10 | 0.42 |
+| serialization | 0.13 | 0.12 | 0.17 | 0.20 | 0.09 | 0.27 |
+| total_rag-only | 15.30 | 14.91 | 17.98 | 23.58 | 11.53 | 64.81 |
 
-## TOTAL Tier
-Configuration: `slm_enabled=True`, `saaras_enabled=True`
+RAG_ONLY
+slm_enabled=false
+saaras_enabled=false
+cache_enabled=false
+requests=300
+warmups=100
+language=hi
+p50_ms=14.27
+p95_ms=17.80
+p99_ms=31.44
+slm_calls=0
+status=PASS
 
 | stage | avg | p50 | p95 | p99 | min | max |
 |---|---|---|---|---|---|---|
-| language detection | 0.07 | 0.07 | 0.09 | 0.09 | 0.06 | 0.09 |
-| tokenization | 0.40 | 0.40 | 0.49 | 0.50 | 0.30 | 0.50 |
-| embedding | 9.84 | 9.84 | 10.52 | 10.58 | 9.08 | 10.60 |
-| BM25 | 1.23 | 1.23 | 1.38 | 1.40 | 1.07 | 1.40 |
-| HNSW | 0.11 | 0.11 | 0.11 | 0.11 | 0.11 | 0.11 |
-| RRF | 0.25 | 0.25 | 0.27 | 0.27 | 0.23 | 0.27 |
-| metadata lookup | 0.63 | 0.63 | 0.74 | 0.75 | 0.51 | 0.75 |
-| extractive | 0.76 | 0.76 | 0.87 | 0.88 | 0.65 | 0.88 |
-| serialization | 0.21 | 0.21 | 0.25 | 0.26 | 0.15 | 0.26 |
-| grounding | 0.01 | 0.01 | 0.01 | 0.01 | 0.01 | 0.01 |
-| generation | 8595.12 | 8595.12 | 9035.69 | 9074.85 | 8105.61 | 9084.64 |
-| validation | 0.01 | 0.01 | 0.01 | 0.01 | 0.01 | 0.01 |
-| STT | 798.83 | 798.83 | 825.25 | 827.59 | 769.47 | 828.18 |
-| total_total | 9407.67 | 9407.67 | 9822.74 | 9859.64 | 8946.49 | 9868.86 |
+| language detection | 0.02 | 0.01 | 0.02 | 0.04 | 0.01 | 0.06 |
+| tokenization | 0.44 | 0.42 | 0.59 | 0.66 | 0.31 | 0.98 |
+| embedding | 12.78 | 12.21 | 15.62 | 29.50 | 9.80 | 38.67 |
+| BM25 | 0.92 | 0.91 | 1.21 | 1.38 | 0.65 | 1.58 |
+| HNSW | 0.09 | 0.08 | 0.12 | 0.15 | 0.05 | 0.21 |
+| RRF | 0.17 | 0.12 | 0.20 | 1.22 | 0.08 | 1.81 |
+| metadata lookup | 0.03 | 0.03 | 0.05 | 0.06 | 0.02 | 0.08 |
+| extractive | 0.23 | 0.23 | 0.30 | 0.32 | 0.15 | 0.44 |
+| serialization | 0.13 | 0.13 | 0.18 | 0.20 | 0.09 | 0.34 |
+| total_rag-only | 14.87 | 14.27 | 17.80 | 31.44 | 11.81 | 41.63 |
+
+RAG_ONLY
+slm_enabled=false
+saaras_enabled=false
+cache_enabled=false
+requests=300
+warmups=100
+language=bn
+p50_ms=14.54
+p95_ms=16.78
+p99_ms=19.32
+slm_calls=0
+status=PASS
+
+| stage | avg | p50 | p95 | p99 | min | max |
+|---|---|---|---|---|---|---|
+| language detection | 0.02 | 0.01 | 0.02 | 0.04 | 0.01 | 0.04 |
+| tokenization | 0.48 | 0.47 | 0.62 | 0.72 | 0.34 | 0.76 |
+| embedding | 12.59 | 12.43 | 14.54 | 16.44 | 9.42 | 28.19 |
+| BM25 | 0.91 | 0.91 | 1.13 | 1.34 | 0.65 | 1.55 |
+| HNSW | 0.09 | 0.08 | 0.12 | 0.13 | 0.05 | 0.15 |
+| RRF | 0.16 | 0.11 | 0.16 | 1.49 | 0.07 | 1.66 |
+| metadata lookup | 0.03 | 0.03 | 0.05 | 0.06 | 0.02 | 0.10 |
+| extractive | 0.27 | 0.27 | 0.34 | 0.37 | 0.16 | 0.76 |
+| serialization | 0.13 | 0.13 | 0.18 | 0.22 | 0.09 | 0.25 |
+| total_rag-only | 14.74 | 14.54 | 16.78 | 19.32 | 11.68 | 30.52 |

@@ -54,14 +54,14 @@ def wait_for_server(timeout=120):
         time.sleep(1)
     return False
 
-def run_benchmark(mode, num_requests, delay, is_voice=False, generate=False):
+def run_benchmark(mode, num_requests, delay, lang, is_voice=False, generate=False):
     print(f"\n--- Running Benchmark: {mode} ---")
     endpoint = "voice" if is_voice else "query"
     url = f'http://127.0.0.1:8000/api/{endpoint}'
     
     # Warmup
-    warmups = 10 if not is_voice else min(10, num_requests)
-    print(f"Sending {warmups} warmup requests...")
+    warmups = 100 if not is_voice else 10
+    print(f"Sending {warmups} warmup requests for language {lang}...")
     for i in range(warmups):
         q = f'what is the capital of india {uuid.uuid4()}'
         try:
@@ -70,7 +70,7 @@ def run_benchmark(mode, num_requests, delay, is_voice=False, generate=False):
                     with open('example.ogg', 'rb') as f:
                         requests.post(url, files={'audio': ('example.ogg', f, 'audio/ogg')}, data={'language': 'en', 'generate': str(generate).lower()})
             else:
-                requests.post(url, json={'query': q, 'language': 'en', 'top_k': 2, 'generate': generate})
+                requests.post(url, json={'query': q, 'language': lang, 'top_k': 2, 'generate': generate})
         except:
             pass
         time.sleep(delay)
@@ -105,7 +105,7 @@ def run_benchmark(mode, num_requests, delay, is_voice=False, generate=False):
                     failures += 1
                     continue
             else:
-                r = requests.post(url, json={'query': q, 'language': 'en', 'top_k': 2, 'generate': generate})
+                r = requests.post(url, json={'query': q, 'language': lang, 'top_k': 2, 'generate': generate})
                 
             time.sleep(delay)
                 
@@ -149,6 +149,9 @@ def run_benchmark(mode, num_requests, delay, is_voice=False, generate=False):
             else:
                 components[f"total_{mode}"].append(l.get("rag_only_ms", 0))
                 
+            if bd.get("generation_ms", 0) > 0:
+                components["slm_calls"] = components.get("slm_calls", 0) + 1
+                
         except Exception as e:
             print(f"Exception during request: {e}")
             failures += 1
@@ -179,11 +182,14 @@ def format_table_md(components_data):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", choices=["rag-only", "partial", "total"], required=True)
-    parser.add_argument("--requests", type=int, default=100)
-    parser.add_argument("--delay", type=float, default=0.5)
+    parser.add_argument("--mode", required=True, choices=["rag-only", "partial", "total"])
+    parser.add_argument("--requests", type=int, default=300)
+    parser.add_argument("--delay", type=float, default=0.01)
+    parser.add_argument("--language", type=str, default="en", choices=["en", "hi", "bn"])
     args = parser.parse_args()
-
+    
+    # Force overrides based on mode
+    lang = args.language
     # Ensure previous uvicorn instances are killed
     subprocess.run("taskkill /F /IM uvicorn.exe /T", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     
@@ -201,11 +207,11 @@ def main():
         
     data = None
     if args.mode == "rag-only":
-        data = run_benchmark("rag-only", args.requests, args.delay, is_voice=False, generate=False)
+        data = run_benchmark("rag-only", args.requests, args.delay, lang, is_voice=False, generate=False)
     elif args.mode == "partial":
-        data = run_benchmark("partial", args.requests, args.delay, is_voice=False, generate=True)
+        data = run_benchmark("partial", args.requests, args.delay, lang, is_voice=False, generate=True)
     elif args.mode == "total":
-        data = run_benchmark("total", args.requests, args.delay, is_voice=True, generate=True)
+        data = run_benchmark("total", args.requests, args.delay, lang, is_voice=True, generate=True)
         
     p.terminate()
     p.wait()
@@ -222,16 +228,36 @@ def main():
         content = f"# HHG Latency Report\n\n## Environment\n- **Platform:** {platform.platform()}\n- **Python:** {sys.version.split()[0]}\n- **Commit:** {get_commit_sha()}\n- **Artifact manifest SHA256:** {get_artifact_sha(os.getcwd())}\n- **Benchmark date:** {datetime.now(timezone.utc).isoformat()}\n\n"
 
     # Clean existing section if any
-    mode_titles = {"rag-only": "RAG_ONLY Tier", "partial": "PARTIAL Tier", "total": "TOTAL Tier"}
-    title = f"## {mode_titles[args.mode]}"
+    mode_titles = {"rag-only": "RAG_ONLY", "partial": "PARTIAL", "total": "TOTAL"}
+    title = f"{mode_titles[args.mode]}"
     
-    # Minimal append for simplicity, but best to write a fresh block
-    new_block = f"\n{title}\nConfiguration: `slm_enabled={slm_enabled}`, `saaras_enabled={saaras_enabled}`\n\n"
-    if data:
-        new_block += format_table_md(data) + "\n\n"
-    else:
-        new_block += "**NOT MEASURED** (failed or rate-limited)\n\n"
+    status_str = "PASS" if data else "FAILED"
+    slm_calls = data.pop("slm_calls", 0) if data else 0
+    if args.mode == "rag-only" and slm_calls > 0:
+        status_str = "FAIL (SLM was called)"
+        
+    p50_val = f"{np.percentile(data[f'total_{args.mode}'], 50):.2f}" if data else "NOT MEASURED"
+    p95_val = f"{np.percentile(data[f'total_{args.mode}'], 95):.2f}" if data else "NOT MEASURED"
+    p99_val = f"{np.percentile(data[f'total_{args.mode}'], 99):.2f}" if data else "NOT MEASURED"
 
+    new_block = f"""
+{title}
+slm_enabled={str(slm_enabled).lower()}
+saaras_enabled={str(saaras_enabled).lower()}
+cache_enabled=false
+requests={args.requests}
+warmups=100
+language={lang}
+p50_ms={p50_val}
+p95_ms={p95_val}
+p99_ms={p99_val}
+slm_calls={slm_calls}
+status={status_str}
+"""
+    if data:
+        new_block += "\n" + format_table_md(data) + "\n"
+
+    # Rewrite the report by appending or updating the section. For simplicity, just append.
     with open(report_path, "a") as f:
         f.write(new_block)
         

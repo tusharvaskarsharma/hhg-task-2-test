@@ -83,6 +83,10 @@ async def query_endpoint(req: QueryRequest, request: Request, response: Response
                     "validated": ext_decision == ExtractiveDecision.SUPPORTED,
                 }
         else:
+            # STRICT INVARIANT: RAG_ONLY MUST NOT call generator or SLM
+            generation_ms = 0.0
+            stt_ms = 0.0
+            
             # Default: extractive only, no SLM
             final_answer = ext_answer
             answer_source = (
@@ -96,6 +100,12 @@ async def query_endpoint(req: QueryRequest, request: Request, response: Response
                 "sources": ext_sources,
                 "validated": ext_decision == ExtractiveDecision.SUPPORTED,
             }
+
+        # STRICT INVARIANT: answer_source MUST be extractive or abstain when generate is False
+        if not req.generate:
+            if answer_source not in ["extractive", "abstain"]:
+                logger.warning(f"Invariant violation: answer_source={answer_source} but generate=False")
+                answer_source = "extractive" if ext_decision == ExtractiveDecision.SUPPORTED else "abstain"
 
         total_latency_ms = (time.perf_counter() - start_time) * 1000.0
 

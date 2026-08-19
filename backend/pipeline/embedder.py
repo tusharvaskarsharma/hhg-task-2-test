@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 class Embedder:
     def __init__(self):
         self.session = loader_instance.onnx_session
+        self.input_names = [i.name for i in self.session.get_inputs()] if self.session else []
         if AutoTokenizer is not None:
             # Prevent 7-second network delay during cold start
             import os
@@ -36,23 +37,22 @@ class Embedder:
         inputs = self.tokenizer(
             formatted_query, 
             return_tensors="np", 
-            padding=True, 
+            padding=False, 
             truncation=True, 
-            max_length=512
+            max_length=256
         )
         tokenization_ms = (time.perf_counter() - t0) * 1000.0
         
         onnx_inputs = {
-            "input_ids": inputs["input_ids"].astype(np.int64),
-            "attention_mask": inputs["attention_mask"].astype(np.int64)
+            "input_ids": inputs["input_ids"].astype(np.int64, copy=False),
+            "attention_mask": inputs["attention_mask"].astype(np.int64, copy=False)
         }
         
-        input_names = [i.name for i in self.session.get_inputs()]
-        if "token_type_ids" in input_names:
+        if "token_type_ids" in self.input_names:
             if "token_type_ids" in inputs:
-                onnx_inputs["token_type_ids"] = inputs["token_type_ids"].astype(np.int64)
+                onnx_inputs["token_type_ids"] = inputs["token_type_ids"].astype(np.int64, copy=False)
             else:
-                onnx_inputs["token_type_ids"] = np.zeros_like(inputs["input_ids"]).astype(np.int64)
+                onnx_inputs["token_type_ids"] = np.zeros_like(inputs["input_ids"], dtype=np.int64)
             
         t1 = time.perf_counter()
         outputs = self.session.run(None, onnx_inputs)

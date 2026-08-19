@@ -15,7 +15,7 @@ class Settings:
 
     # HNSW — support both HHG_HNSW_EF_SEARCH (canonical) and legacy HNSW_EF_SEARCH
     HNSW_EF_SEARCH = int(
-        os.getenv("HHG_HNSW_EF_SEARCH") or os.getenv("HNSW_EF_SEARCH", "64")
+        os.getenv("HHG_HNSW_EF_SEARCH") or os.getenv("HNSW_EF_SEARCH", "32")
     )
 
     # ONNX thread tuning
@@ -49,12 +49,12 @@ class Settings:
 
     # SLM Settings
     SLM_ENABLED = parse_bool(os.getenv("HHG_SLM_ENABLED"), default=False)
-    SLM_PROVIDER = os.getenv("HHG_SLM_PROVIDER", "generic")
-    SLM_BASE_URL = os.getenv("HHG_SLM_BASE_URL", "http://localhost:8080/v1")
-    SLM_MODEL = os.getenv("HHG_SLM_MODEL", "default")
+    SLM_PROVIDER = os.getenv("HHG_SLM_PROVIDER", "groq")
+    SLM_BASE_URL = os.getenv("HHG_SLM_BASE_URL", "https://api.groq.com/openai/v1/chat/completions")
+    SLM_MODEL = os.getenv("HHG_SLM_MODEL", "llama-3.1-8b-instant")
     SLM_API_KEY = os.getenv("HHG_SLM_API_KEY", "")
-    SLM_TIMEOUT_SECONDS = int(os.getenv("HHG_SLM_TIMEOUT_SECONDS", "30"))
-    SLM_MAX_TOKENS = int(os.getenv("HHG_SLM_MAX_TOKENS", "1024"))
+    SLM_TIMEOUT_SECONDS = int(os.getenv("HHG_SLM_TIMEOUT_SECONDS", "10"))
+    SLM_MAX_TOKENS = int(os.getenv("HHG_SLM_MAX_TOKENS", "256"))
     SLM_TEMPERATURE = float(os.getenv("HHG_SLM_TEMPERATURE", "0.0"))
 
     # Grounding Settings
