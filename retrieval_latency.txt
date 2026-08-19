@@ -1,0 +1,39 @@
+============================================================
+HHG RETRIEVAL LATENCY BENCHMARK
+============================================================
+
+Environment: Windows | Python 3.13.14
+Processor: AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD
+Timestamp: 2026-08-18T11:37:26.516500
+
+Dataset: hinval.parquet
+Queries benchmarked: 20
+Warmup runs: 10
+Repeats per query: 1
+Top K: 10
+
+Component       p50        p95        mean       min        max       
+------------------------------------------------------------
+Embedding       2.28       2.49       2.24       2.03       2.56      
+BM25            1.55       1.73       1.54       1.22       1.78      
+HNSW            1.54       1.58       1.52       1.08       1.60      
+RRF             0.03       0.08       0.04       0.02       0.08      
+End-to-End      5.40       5.63       5.38       5.07       5.66      
+------------------------------------------------------------
+
+OVERHEAD ANALYSIS:
+Measured End-to-End Mean: 5.38 ms
+Component Sum Mean:       5.35 ms
+Difference (Framework):   0.03 ms
+
+============================================================
+LATENCY SUMMARY
+============================================================
+
+Target:
+p50: N/A
+p95: N/A
+
+Actual:
+p50: 5.40 ms
+p95: 5.63 ms

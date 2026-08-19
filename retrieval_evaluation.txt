@@ -1,0 +1,30 @@
+============================================================
+HHG RETRIEVAL EVALUATION
+============================================================
+
+Dataset: hinval.parquet
+Language: hi
+Queries: 3
+
+Metric          BM25         HNSW         RRF         
+------------------------------------------------------------
+HitRate@1       0.3333       0.3333       0.3333      
+HitRate@5       0.6667       0.6667       0.6667      
+HitRate@10      0.6667       0.6667       0.6667      
+HitRate@20      0.6667       0.6667       0.6667      
+
+Recall@1        0.3333       0.3333       0.3333      
+Recall@5        0.6667       0.6667       0.6667      
+Recall@10       0.6667       0.6667       0.6667      
+Recall@20       0.6667       0.6667       0.6667      
+
+MRR             0.5000       0.5000       0.5000      
+nDCG@1          0.3333       0.3333       0.3333      
+nDCG@5          0.5436       0.5436       0.5436      
+nDCG@10         0.5436       0.5436       0.5436      
+nDCG@20         0.5436       0.5436       0.5436      
+------------------------------------------------------------
+
+BASELINE COMPARISON:
+Proxy HitRate@10: 0.7788 (Phase-A Baseline)
+Note: Not directly comparable unless evaluation protocols perfectly align.

@@ -1,0 +1,19 @@
+{
+    "cache_enabled": true,
+    "max_size": 1000,
+    "ttl_seconds": 3600,
+    "total_requests": 100,
+    "hits": 80,
+    "misses": 20,
+    "hit_rate": 0.8,
+    "evictions": 0,
+    "expirations": 0,
+    "uncached_latency": {
+        "p50_ms": 5.566650001128437,
+        "p95_ms": 5.715564995261957
+    },
+    "cache_hit_latency": {
+        "p50_ms": 0.011999996786471456,
+        "p95_ms": 0.04469499799597542
+    }
+}

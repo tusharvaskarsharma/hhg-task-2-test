@@ -1,0 +1,8 @@
+hhg_rag_artifacts
+hhg_rag_artifacts.zip
+__pycache__/
+*.py[cod]
+.env
+.pytest_cache/
+node_modules/
+.vscode/

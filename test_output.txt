@@ -1,0 +1,9 @@
+
+--- Testing query: भारत की राजधानी क्या है? (hi) ---
+Got 0 results. Cache hit: False
+
+--- Testing query: বাংলাদেশের রাজধানী কী? (bn) ---
+Got 0 results. Cache hit: False
+
+--- Testing query: What is the capital of India? (en) ---
+Got 0 results. Cache hit: False
