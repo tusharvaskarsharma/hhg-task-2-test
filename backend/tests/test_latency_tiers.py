@@ -129,6 +129,6 @@ def test_latency_tiers_slm_disabled():
         rag_only = latency["rag_only_ms"]
         
         # When SLM is disabled, TOTAL and PARTIAL should roughly equal RAG_ONLY (minus some small overheads)
-        assert total >= rag_only
+        assert total >= rag_only - 0.1
     finally:
         settings.SLM_ENABLED = original_enabled

@@ -7,6 +7,7 @@ from backend.pipeline.extractive import (
     build_extractive_answer,
     ExtractiveDecision,
 )
+from backend.schemas.response import RetrievalResult
 
 
 def _make_result(doc_id: str, text: str, score: float = 0.5):
@@ -94,3 +95,72 @@ def test_extractive_deduplicates_sentences():
     sentences = [s.strip() for s in answer.split(".") if s.strip()]
     unique = set(sentences)
     assert len(sentences) <= len(unique) + 1  # allow 1 near-duplicate
+
+
+def test_api_query_extractive_fast_path(monkeypatch):
+    """
+    Route-level regression test:
+    Verify POST /api/query with generate=false returns properly formatted response,
+    sources is a list of dicts with correct keys, and SLM is bypassed.
+    """
+    from fastapi.testclient import TestClient
+    from backend.main import app
+    from backend.pipeline.generator import generator_service
+    from backend.pipeline.retrieval_service import retrieval_service
+    from backend.schemas.response import RetrievalResult
+    import asyncio
+
+    # 1. Mock retrieval to return standard results
+    retrieval_service.initialized = True
+    def mock_execute(*args, **kwargs):
+        return {
+            "query": "capital of india",
+            "language": "en",
+            "results": [
+                RetrievalResult(doc_id="doc1", text="The capital of India is New Delhi.", score=0.9, rank=1, source="bm25")
+            ],
+            "cache": {"hit": False},
+            "latency": {"total_ms": 1.0},
+            "latency_breakdown": {
+                "language_detection_ms": 1.0,
+                "tokenization_ms": 1.0,
+                "embedding_ms": 1.0,
+                "bm25_ms": 1.0,
+                "hnsw_ms": 1.0,
+                "rrf_ms": 1.0,
+                "metadata_ms": 1.0
+            },
+            "rag_only_base_ms": 7.0
+        }
+    monkeypatch.setattr(retrieval_service, "execute_query", mock_execute)
+
+    # 2. Track if generate is called
+    generate_called = False
+    async def mock_generate(*args, **kwargs):
+        nonlocal generate_called
+        generate_called = True
+        return "Fake generated response"
+    monkeypatch.setattr(generator_service, "generate", mock_generate)
+
+    client = TestClient(app)
+    response = client.post("/api/query", json={"query": "capital of india", "language": "en", "generate": False})
+    # 1. POST /api/query with generate=false returns HTTP 200
+    assert response.status_code == 200
+    data = response.json()
+
+    # 5. answer_source is extractive or abstain
+    assert data["answer_source"] in ["extractive", "abstain"]
+
+    # 2. response.sources is a list of dictionaries
+    sources = data.get("sources", [])
+    assert isinstance(sources, list)
+    if len(sources) > 0:
+        assert isinstance(sources[0], dict)
+        # 3. every source contains doc_id, rank, and source
+        for source in sources:
+            assert "doc_id" in source
+            assert "rank" in source
+            assert "source" in source
+
+    # 4. generator_service.generate is not called
+    assert not generate_called

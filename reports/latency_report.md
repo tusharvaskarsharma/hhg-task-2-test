@@ -1,20 +1,11 @@
+# HHG Latency Report
 
-## RAG_ONLY Tier
-Configuration: `slm_enabled=False`, `saaras_enabled=False`
-
-| stage | avg | p50 | p95 | p99 | min | max |
-|---|---|---|---|---|---|---|
-| language detection | 0.01 | 0.01 | 0.02 | 0.02 | 0.01 | 0.02 |
-| tokenization | 0.45 | 0.43 | 0.53 | 0.55 | 0.38 | 0.55 |
-| embedding | 12.62 | 11.73 | 16.09 | 17.10 | 11.01 | 17.35 |
-| BM25 | 0.99 | 0.94 | 1.23 | 1.28 | 0.78 | 1.29 |
-| HNSW | 0.12 | 0.12 | 0.14 | 0.15 | 0.11 | 0.15 |
-| RRF | 0.34 | 0.24 | 0.77 | 1.08 | 0.22 | 1.16 |
-| metadata lookup | 0.28 | 0.27 | 0.37 | 0.39 | 0.22 | 0.40 |
-| extractive | 0.14 | 0.14 | 0.19 | 0.21 | 0.10 | 0.21 |
-| serialization | 0.13 | 0.11 | 0.25 | 0.32 | 0.09 | 0.34 |
-| total_rag-only | 15.17 | 14.34 | 18.67 | 19.85 | 13.31 | 20.15 |
-
+## Environment
+- **Platform:** Windows-11-10.0.26200-SP0
+- **Python:** 3.13.14
+- **Commit:** b5dad0db5d577f66b874cf8d88a0ccd57565de9f
+- **Artifact manifest SHA256:** a7a071b88f6f6800
+- **Benchmark date:** 2026-08-19T21:02:28.950406Z
 
 ## RAG_ONLY Tier
 Configuration: `slm_enabled=False`, `saaras_enabled=False`
@@ -31,68 +22,6 @@ Configuration: `slm_enabled=False`, `saaras_enabled=False`
 | extractive | 0.14 | 0.13 | 0.16 | 0.16 | 0.10 | 0.16 |
 | serialization | 0.12 | 0.12 | 0.15 | 0.16 | 0.09 | 0.16 |
 | total_rag-only | 14.81 | 13.75 | 19.36 | 20.58 | 13.10 | 20.88 |
-
-
-## PARTIAL Tier
-Configuration: `slm_enabled=True`, `saaras_enabled=False`
-
-| stage | avg | p50 | p95 | p99 | min | max |
-|---|---|---|---|---|---|---|
-| language detection | 0.01 | 0.01 | 0.01 | 0.01 | 0.01 | 0.01 |
-| tokenization | 0.51 | 0.51 | 0.51 | 0.51 | 0.51 | 0.51 |
-| embedding | 13.71 | 13.71 | 13.71 | 13.71 | 13.71 | 13.71 |
-| BM25 | 1.01 | 1.01 | 1.01 | 1.01 | 1.01 | 1.01 |
-| HNSW | 0.12 | 0.12 | 0.12 | 0.12 | 0.12 | 0.12 |
-| RRF | 0.21 | 0.21 | 0.21 | 0.21 | 0.21 | 0.21 |
-| metadata lookup | 18.57 | 18.57 | 18.57 | 18.57 | 18.57 | 18.57 |
-| extractive | 0.53 | 0.53 | 0.53 | 0.53 | 0.53 | 0.53 |
-| serialization | 0.23 | 0.23 | 0.23 | 0.23 | 0.23 | 0.23 |
-| grounding | 0.01 | 0.01 | 0.01 | 0.01 | 0.01 | 0.01 |
-| generation | 718.25 | 718.25 | 718.25 | 718.25 | 718.25 | 718.25 |
-| validation | 2.99 | 2.99 | 2.99 | 2.99 | 2.99 | 2.99 |
-| total_partial | 756.33 | 756.33 | 756.33 | 756.33 | 756.33 | 756.33 |
-
-
-## PARTIAL Tier
-Configuration: `slm_enabled=True`, `saaras_enabled=False`
-
-| stage | avg | p50 | p95 | p99 | min | max |
-|---|---|---|---|---|---|---|
-| language detection | 0.02 | 0.01 | 0.03 | 0.03 | 0.01 | 0.03 |
-| tokenization | 0.46 | 0.46 | 0.55 | 0.56 | 0.36 | 0.56 |
-| embedding | 12.02 | 11.76 | 12.99 | 13.12 | 11.43 | 13.15 |
-| BM25 | 0.95 | 0.95 | 1.03 | 1.04 | 0.87 | 1.04 |
-| HNSW | 0.12 | 0.12 | 0.12 | 0.12 | 0.11 | 0.12 |
-| RRF | 0.23 | 0.23 | 0.24 | 0.24 | 0.21 | 0.24 |
-| metadata lookup | 0.29 | 0.28 | 0.34 | 0.34 | 0.24 | 0.35 |
-| extractive | 0.23 | 0.24 | 0.27 | 0.27 | 0.19 | 0.27 |
-| serialization | 0.13 | 0.12 | 0.16 | 0.16 | 0.10 | 0.16 |
-| grounding | 0.01 | 0.01 | 0.01 | 0.01 | 0.01 | 0.01 |
-| generation | 4916.25 | 4659.69 | 9075.90 | 9214.08 | 1097.01 | 9248.62 |
-| validation | 1.67 | 1.61 | 2.98 | 3.01 | 0.42 | 3.02 |
-| total_partial | 4932.52 | 4675.55 | 9094.11 | 9232.44 | 1111.97 | 9267.02 |
-
-
-## TOTAL Tier
-Configuration: `slm_enabled=True`, `saaras_enabled=True`
-
-| stage | avg | p50 | p95 | p99 | min | max |
-|---|---|---|---|---|---|---|
-| language detection | 0.05 | 0.05 | 0.05 | 0.05 | 0.05 | 0.05 |
-| tokenization | 0.46 | 0.46 | 0.57 | 0.58 | 0.33 | 0.59 |
-| embedding | 8.14 | 8.14 | 8.70 | 8.75 | 7.53 | 8.76 |
-| BM25 | 0.88 | 0.88 | 0.89 | 0.89 | 0.88 | 0.89 |
-| HNSW | 0.12 | 0.12 | 0.14 | 0.14 | 0.11 | 0.14 |
-| RRF | 0.21 | 0.21 | 0.25 | 0.25 | 0.18 | 0.25 |
-| metadata lookup | 0.65 | 0.65 | 0.67 | 0.67 | 0.64 | 0.67 |
-| extractive | 0.70 | 0.70 | 0.72 | 0.73 | 0.67 | 0.73 |
-| serialization | 0.15 | 0.15 | 0.16 | 0.16 | 0.15 | 0.16 |
-| grounding | 0.01 | 0.01 | 0.02 | 0.02 | 0.01 | 0.02 |
-| generation | 7566.99 | 7566.99 | 8901.58 | 9020.21 | 6084.11 | 9049.87 |
-| validation | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
-| STT | 948.47 | 948.47 | 949.92 | 950.05 | 946.87 | 950.08 |
-| total_total | 8527.05 | 8527.05 | 9862.34 | 9981.04 | 7043.39 | 10010.71 |
-
 
 ## PARTIAL Tier
 Configuration: `slm_enabled=True`, `saaras_enabled=False`
@@ -113,28 +42,6 @@ Configuration: `slm_enabled=True`, `saaras_enabled=False`
 | validation | 3.05 | 2.97 | 3.26 | 3.28 | 2.90 | 3.29 |
 | total_partial | 3543.37 | 1919.33 | 7424.85 | 7914.23 | 674.20 | 8036.58 |
 
-
-## TOTAL Tier
-Configuration: `slm_enabled=True`, `saaras_enabled=True`
-
-| stage | avg | p50 | p95 | p99 | min | max |
-|---|---|---|---|---|---|---|
-| language detection | 0.03 | 0.03 | 0.03 | 0.03 | 0.03 | 0.03 |
-| tokenization | 0.33 | 0.33 | 0.33 | 0.33 | 0.33 | 0.33 |
-| embedding | 7.57 | 7.57 | 7.57 | 7.57 | 7.57 | 7.57 |
-| BM25 | 0.96 | 0.96 | 0.96 | 0.96 | 0.96 | 0.96 |
-| HNSW | 0.08 | 0.08 | 0.08 | 0.08 | 0.08 | 0.08 |
-| RRF | 0.18 | 0.18 | 0.18 | 0.18 | 0.18 | 0.18 |
-| metadata lookup | 0.71 | 0.71 | 0.71 | 0.71 | 0.71 | 0.71 |
-| extractive | 0.56 | 0.56 | 0.56 | 0.56 | 0.56 | 0.56 |
-| serialization | 0.34 | 0.34 | 0.34 | 0.34 | 0.34 | 0.34 |
-| grounding | 0.01 | 0.01 | 0.01 | 0.01 | 0.01 | 0.01 |
-| generation | 9073.91 | 9073.91 | 9073.91 | 9073.91 | 9073.91 | 9073.91 |
-| validation | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
-| STT | 793.64 | 793.64 | 793.64 | 793.64 | 793.64 | 793.64 |
-| total_total | 9878.45 | 9878.45 | 9878.45 | 9878.45 | 9878.45 | 9878.45 |
-
-
 ## TOTAL Tier
 Configuration: `slm_enabled=True`, `saaras_enabled=True`
 
@@ -154,4 +61,3 @@ Configuration: `slm_enabled=True`, `saaras_enabled=True`
 | validation | 0.01 | 0.01 | 0.01 | 0.01 | 0.01 | 0.01 |
 | STT | 798.83 | 798.83 | 825.25 | 827.59 | 769.47 | 828.18 |
 | total_total | 9407.67 | 9407.67 | 9822.74 | 9859.64 | 8946.49 | 9868.86 |
-
