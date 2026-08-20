@@ -35,7 +35,14 @@ class Settings:
     CACHE_VERSION = os.getenv("HHG_CACHE_VERSION") or os.getenv("CACHE_VERSION", "v1")
 
     # API Settings
-    CORS_ORIGINS = os.getenv("HHG_CORS_ORIGINS", "").split(",") if os.getenv("HHG_CORS_ORIGINS") else []
+    CORS_ORIGINS = [
+        origin.strip()
+        for origin in os.getenv(
+            "HHG_CORS_ORIGINS",
+            "http://127.0.0.1:3000,http://localhost:3000",
+        ).split(",")
+        if origin.strip()
+    ]
     DEBUG = parse_bool(os.getenv("HHG_DEBUG"), default=False)
     LOG_LEVEL = os.getenv("HHG_LOG_LEVEL", "INFO").upper()
 
