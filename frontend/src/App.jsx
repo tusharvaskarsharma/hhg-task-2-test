@@ -97,7 +97,8 @@ const App = () => {
               state={voiceAPI.state}
               onStart={voiceAPI.startRecording}
               onStop={handleVoiceStop}
-              disabled={textAPI.loading}
+              disabled={textAPI.loading || (sysStatus && sysStatus.saaras?.enabled === false)}
+              title={sysStatus && sysStatus.saaras?.enabled === false ? "Speech to text service is disabled" : undefined}
             />
           </div>
         </div>

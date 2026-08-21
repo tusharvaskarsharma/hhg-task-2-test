@@ -213,7 +213,7 @@ async def query_endpoint(req: QueryRequest, request: Request, response: Response
                         grounding_obj = gen_grounding
                     else:
                         final_answer = ext_answer
-                        if answer_source == "generated-unavailable" and ext_decision != ExtractiveDecision.SUPPORTED:
+                        if answer_source == "generated-unavailable":
                             pass
                         else:
                             answer_source = "extractive" if ext_decision == ExtractiveDecision.SUPPORTED else "abstain"

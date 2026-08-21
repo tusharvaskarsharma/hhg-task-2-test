@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Bot, AlertTriangle, ShieldCheck, Clock, Sparkles } from 'lucide-react';
+import { Bot, AlertTriangle, ShieldCheck } from 'lucide-react';
 import gsap from 'gsap';
 
 const AnswerPanel = ({ data }) => {
@@ -50,7 +50,7 @@ const AnswerPanel = ({ data }) => {
            </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+        <div className="w-full">
           {/* Extractive Answer Card */}
           <div className="w-full glass-panel p-6 relative flex flex-col">
             <div className="flex items-center justify-between mb-4">
@@ -80,58 +80,6 @@ const AnswerPanel = ({ data }) => {
                 </span>
               </div>
             </div>
-          </div>
-
-          {/* Generated Answer Card */}
-          <div className="w-full glass-panel p-6 relative flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-text flex items-center">
-                <Sparkles className="w-5 h-5 mr-2 text-secondary" />
-                {answer_source === 'generated-unavailable' ? 'Generated answer unavailable' : 'Generated answer'}
-              </h3>
-              {generated_answer && (
-                <div className="flex items-center space-x-1 text-xs font-medium text-success bg-success/10 px-2 py-1 rounded-full border border-success/20">
-                  <ShieldCheck className="w-3 h-3" />
-                  <span>SLM grounded</span>
-                </div>
-              )}
-            </div>
-            <div className="flex-1 text-base text-text leading-relaxed font-medium mb-4">
-              {answer_source === 'generated-unavailable' ? (
-                <span className="text-textMuted italic">The generation service is not configured or is currently unavailable.</span>
-              ) : (
-                generated_answer ? generated_answer : <span className="text-textMuted italic">Not available.</span>
-              )}
-            </div>
-            {generated_answer && (
-              <div className="pt-4 border-t border-border flex flex-col space-y-2 text-xs font-medium text-textMuted/80 mt-auto">
-                 <div className="flex items-center">
-                    <span className="mr-2 uppercase tracking-wide opacity-70">Latency:</span>
-                    <span className="flex items-center text-text">
-                      <Clock className="w-3 h-3 mr-1" />
-                      {latency?.breakdown?.generation_ms?.toFixed(0) || 0} ms
-                    </span>
-                 </div>
-                 <div className="flex items-center">
-                  <span className="mr-2 uppercase tracking-wide opacity-70">Model:</span>
-                  <span className="bg-surface border border-border px-2 py-0.5 rounded-md flex-1 truncate">
-                    llama-3.1-8b-instant
-                  </span>
-                 </div>
-                 <div className="flex items-center">
-                  <span className="mr-2 uppercase tracking-wide opacity-70">Source IDs:</span>
-                  <span className="bg-surface border border-border px-2 py-0.5 rounded-md flex-1 truncate">
-                    {grounding?.sources?.map(s => s.id).join(', ') || "N/A"}
-                  </span>
-                </div>
-                <div className="flex items-center">
-                  <span className="mr-2 uppercase tracking-wide opacity-70">Answer source:</span>
-                  <span className="bg-surface border border-border px-2 py-0.5 rounded-md">
-                    generated
-                  </span>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}

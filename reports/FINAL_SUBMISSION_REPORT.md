@@ -139,3 +139,55 @@ HHG/
 **Cleanup status:** completed. The approved disposable logs, caches, duplicate historical reports, one-off diagnostic scripts, and zero-byte Phase A placeholders were removed. The `reports/` directory now contains only this final report. Protected source, tests, configuration, production artifacts, ground truth, and the two retained benchmark runners remain present.
 
 **Runtime status:** ready for submission. HNSW is now FAISS-backed for all three languages, with counts and sequential labels aligned to metadata: HI 101,368; EN 99,501; BN 100,000. The full suite passes 132/132 and artifact validation passes.
+
+
+## Localhost restart and smoke-test report
+
+The local HHG services were restarted from the project root and tested through localhost.
+
+| Local service/check | Result | Evidence |
+|---|---|---|
+| Frontend `http://127.0.0.1:5173` | PASS | HTTP 200; UI loaded in the connected browser |
+| Backend `http://127.0.0.1:8000` | PASS | Uvicorn running on `127.0.0.1:8000` |
+| `GET /api/health` | PASS | HTTP 200 |
+| `GET /api/ready` | PASS | HTTP 200; status `ready` |
+| Browser CORS preflight | PASS | `Access-Control-Allow-Origin: http://127.0.0.1:5173` |
+| Hindi RAG_ONLY query | HTTP PASS; answer review needed | HTTP 200, 10 results, safe abstention, 171.81 ms server time |
+| English RAG_ONLY query | PASS | HTTP 200, extractive grounded answer, 10 results, 1.59 ms server time |
+| Bengali RAG_ONLY query | HTTP PASS; answer review needed | HTTP 200, 10 results, safe abstention, 120.95 ms server time |
+| English OOD RAG_ONLY query | PASS | HTTP 200, safe abstention, 1.11 ms server time |
+| English RAG+SLM query | PASS with fallback | HTTP 200, grounded extractive fallback; generation service was unavailable for this request |
+
+The browser-level test submitted `daniel zovatto actor` successfully. The UI displayed the correct extractive answer, five retrieval-context sources, and a RAG-only latency of approximately 1.27 ms. The generated-answer panel correctly showed a safe service-unavailable fallback rather than a fabricated answer.
+
+The direct Hindi and Bengali smoke tests returned HTTP 200 and safe abstentions, but they did not produce the expected factual answers in this particular fresh-process run. This does not affect backend availability, artifact loading, or the previously verified aggregate Recall@10 result, but these two language-specific queries should be manually reviewed before claiming perfect per-query behavior.
+
+## Current local access
+
+| Component | Address |
+|---|---|
+| HHG frontend | http://127.0.0.1:5173 |
+| HHG backend | http://127.0.0.1:8000 |
+| Health | http://127.0.0.1:8000/api/health |
+| Readiness | http://127.0.0.1:8000/api/ready |
+
+Both local processes were left running after verification.
+
+## Localhost conclusion
+
+**Local services: READY.** The frontend loads, the backend is healthy and ready, CORS is correctly configured, the English end-to-end browser query succeeds, the OOD safety behavior succeeds, and the generated path fails safely when the external generation service is unavailable. The Hindi and Bengali smoke-query abstentions are recorded transparently for follow-up semantic review rather than being hidden.
+
+
+## Actual browser UI multilingual test
+
+The running application was tested through the real browser interface at `http://127.0.0.1:5173`, with the language selector changed separately for each language.
+
+| Language | UI question | Displayed extractive answer | UI result |
+|---|---|---|---|
+| Hindi | `उपकरण मरम्मत की लागत` | Average appliance repair cost is **$171**, with most repairs between **$108 and $238**; answer was displayed in Hindi and marked Dataset grounded | PASS; 5 retrieval sources; RAG-only 25.07 ms; total 142.25 ms |
+| English | `daniel zovatto actor` | Daniel Zovatto is a **Costa Rican actor** who portrays **Jack Kipling** in Season 2 of AMC's *Fear the Walking Dead* | PASS; 5 retrieval sources; total 4.70 ms; marked Dataset grounded |
+| Bengali | `দ্বিতীয় অনুমতির খরচ` | The second or subsequent annual resident permit has an additional **৩৫ পাউন্ড** charge, which is non-refundable; answer was displayed in Bengali and marked Dataset grounded | PASS; 5 retrieval sources; first cold RAG-only 626.15 ms, repeated warm request 2.19 ms |
+
+For all three browser tests, the generated-answer panel safely displayed that the generation service was unavailable; the application did not fabricate a generated answer. The extractive RAG answer and retrieval context remained available.
+
+The first Bengali request shows a cold-start latency spike above the 50 ms RAG_ONLY target, while the immediate repeated request completed in 2.19 ms through the warm cache. The aggregate 300-request benchmark remains the authoritative SLA result: RAG_ONLY P50/P95/P99 = 15.38/19.36/21.72 ms and RAG+SLM P95/P99 = 123.43/159.10 ms.

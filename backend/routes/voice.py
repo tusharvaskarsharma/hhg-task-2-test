@@ -131,7 +131,7 @@ async def voice_endpoint(
             else:
                 final_answer = ext_answer
                 
-                if answer_source == "generated-unavailable" and ext_decision != ExtractiveDecision.SUPPORTED:
+                if answer_source == "generated-unavailable":
                     pass # keep generated-unavailable
                 else:
                     answer_source = "extractive" if ext_decision == ExtractiveDecision.SUPPORTED else "abstain"

@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Mic, Square } from 'lucide-react';
 import gsap from 'gsap';
 
-const VoiceInput = ({ state, onStart, onStop, disabled }) => {
+const VoiceInput = ({ state, onStart, onStop, disabled, title }) => {
   const buttonRef = useRef(null);
   const rippleRef = useRef(null);
 
@@ -45,7 +45,7 @@ const VoiceInput = ({ state, onStart, onStop, disabled }) => {
         onClick={isRecording ? onStop : onStart}
         disabled={disabled}
         aria-label={isRecording ? "Stop recording" : "Start voice query"}
-        title={isRecording ? "Stop recording" : "Ask by voice"}
+        title={title || (isRecording ? "Stop recording" : "Ask by voice")}
         className={`relative z-10 w-14 h-14 rounded-full flex items-center justify-center transition-colors shadow-glass focus:outline-none focus:ring-4 ${
           isRecording 
             ? 'bg-error hover:bg-error/90 focus:ring-error/30' 

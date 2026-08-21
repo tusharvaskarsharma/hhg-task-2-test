@@ -72,9 +72,9 @@ class Settings:
     SLM_ENABLED = parse_bool(os.getenv("HHG_SLM_ENABLED"), default=False)
     SLM_PROVIDER = os.getenv("HHG_SLM_PROVIDER", "groq")
     SLM_BASE_URL = os.getenv("HHG_SLM_BASE_URL", "https://api.groq.com/openai/v1/chat/completions")
-    SLM_MODEL = os.getenv("HHG_SLM_MODEL", "llama-3.1-8b-instant")
+    SLM_MODEL = os.getenv("HHG_SLM_MODEL", "groq/compound-mini")
     SLM_API_KEY = os.getenv("HHG_SLM_API_KEY", "")
-    SLM_TIMEOUT_SECONDS = float(os.getenv("HHG_SLM_TIMEOUT_SECONDS", "0.2"))
+    SLM_TIMEOUT_SECONDS = float(os.getenv("HHG_SLM_TIMEOUT_SECONDS", "5.0"))
 
     SLM_MAX_TOKENS = int(os.getenv("HHG_SLM_MAX_TOKENS", "128"))
     SLM_TEMPERATURE = float(os.getenv("HHG_SLM_TEMPERATURE", "0.0"))

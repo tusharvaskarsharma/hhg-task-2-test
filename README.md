@@ -274,3 +274,35 @@ The project is ready for submission because the full suite passes, artifact read
 ## Internal project evidence
 
 The final evidence report is [`reports/FINAL_SUBMISSION_REPORT.md`](reports/FINAL_SUBMISSION_REPORT.md). The diagram source files are [`docs/project_flow.mmd`](docs/project_flow.mmd) and [`docs/user_flow.mmd`](docs/user_flow.mmd). The graph assets are stored in `docs/` and are generated from the verified benchmark values documented above.
+
+
+## Latest localhost verification
+
+The backend and frontend were restarted locally and verified through both direct HTTP requests and the connected browser.
+
+| Check | Result |
+|---|---|
+| Frontend `http://127.0.0.1:5173` | HTTP 200; UI loaded successfully |
+| Backend `http://127.0.0.1:8000` | Running successfully |
+| `/api/health` | HTTP 200 |
+| `/api/ready` | HTTP 200; `ready` |
+| CORS from `127.0.0.1:5173` | PASS |
+| English browser query | PASS; grounded extractive answer and five retrieval-context sources |
+| English OOD query | PASS; safe abstention |
+| Hindi/Bengali smoke queries | HTTP 200 with safe abstention; manual semantic review recommended for those sample queries |
+| RAG+SLM fallback | PASS; unavailable generation service produced a safe fallback rather than hallucinating |
+
+Open the application at **http://127.0.0.1:5173**. The backend health and readiness endpoints are available at **http://127.0.0.1:8000/api/health** and **http://127.0.0.1:8000/api/ready**. Both local processes were left running after verification. Full request-level details are recorded in [`reports/FINAL_SUBMISSION_REPORT.md`](reports/FINAL_SUBMISSION_REPORT.md).
+
+
+## Actual browser UI multilingual test
+
+The live interface was tested at `http://127.0.0.1:5173` by selecting each language manually and submitting a real question.
+
+| Language | Question | Expected key fact | Observed result |
+|---|---|---|---|
+| Hindi | `उपकरण मरम्मत की लागत` | Average cost **$171**; most repairs cost **$108–$238** | Hindi extractive answer displayed, Dataset grounded, five retrieval sources, RAG-only 25.07 ms |
+| English | `daniel zovatto actor` | Costa Rican actor; played Jack Kipling in Season 2 of *Fear the Walking Dead* | Correct English extractive answer displayed, Dataset grounded, five retrieval sources, 4.70 ms |
+| Bengali | `দ্বিতীয় অনুমতির খরচ` | Additional charge of **৩৫ পাউন্ড** for a second or subsequent permit | Correct Bengali extractive answer displayed, Dataset grounded, five retrieval sources; first cold request 626.15 ms RAG-only, repeat request 2.19 ms |
+
+The generated-answer panel safely reported that the generation service was unavailable during this UI test, while the grounded extractive answer remained visible. The cold Bengali request had a one-time startup/cache latency spike; the repeated warm request was within the 50 ms RAG-only target. The aggregate benchmark remains the authoritative latency result.

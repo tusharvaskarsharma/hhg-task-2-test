@@ -6,7 +6,7 @@ export const useQuery = () => {
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
 
-  const submitQuery = async (queryText, language) => {
+  const submitQuery = async (queryText, language, topK = 5, generate = false) => {
     if (!queryText || !queryText.trim()) return;
     
     setLoading(true);
@@ -14,7 +14,7 @@ export const useQuery = () => {
     setData(null);
 
     try {
-      const response = await executeQuery(queryText, language);
+      const response = await executeQuery(queryText, language, topK, generate);
       setData(response);
     } catch (err) {
       setError(err);

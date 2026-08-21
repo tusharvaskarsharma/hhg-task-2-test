@@ -1,7 +1,9 @@
+"""
+Final workload benchmark script to measure system latency and accuracy.
+"""
 import argparse
 import json
 import os
-import platform
 import random
 import statistics
 import subprocess
@@ -17,6 +19,7 @@ LANGUAGES = ["hi", "en", "bn"]
 
 
 def pct(values, p):
+    """Calculate the p-th percentile of a list of values."""
     if not values:
         return None
     values = sorted(float(v) for v in values)
@@ -29,6 +32,7 @@ def pct(values, p):
 
 
 def stats(rows, key):
+    """Calculate statistics for a specific key in a list of rows."""
     vals = [r[key] for r in rows if r.get(key) is not None]
     if not vals:
         return {"count": 0, "p50": None, "p95": None, "p99": None, "max": None, "mean": None}
@@ -43,6 +47,7 @@ def stats(rows, key):
 
 
 def load_ground_truth(path):
+    """Load ground truth data and group by language."""
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     by_lang = {lang: [] for lang in LANGUAGES}
     for item in data["queries"]:
@@ -52,6 +57,7 @@ def load_ground_truth(path):
 
 
 def make_workload(by_lang, per_language, seed):
+    """Generate a pseudo-random benchmark workload."""
     rng = random.Random(seed)
     workload = []
     for lang in LANGUAGES:
@@ -69,7 +75,9 @@ def make_workload(by_lang, per_language, seed):
             item["repeat_of"] = unique[idx % unique_n]["query_id"]
         ood_templates = {
             "hi": ["यह प्रश्न उपलब्ध संग्रह के बाहर की एक काल्पनिक जानकारी के बारे में है {}"],
-            "en": ["This is an intentionally out-of-dataset question about an unavailable topic {}"],
+            "en": [
+                "This is an intentionally out-of-dataset question about an unavailable topic {}"
+            ],
             "bn": ["এটি সংগ্রহের বাইরের একটি কাল্পনিক বিষয় সম্পর্কে প্রশ্ন {}"],
         }
         entries = []
@@ -81,21 +89,24 @@ def make_workload(by_lang, per_language, seed):
         for item in repeats:
             entries.append(item)
         for idx in range(ood_n):
-            entries.append({
-                "query_id": f"ood:{lang}:{idx}",
-                "language": lang,
-                "query": ood_templates[lang][0].format(seed + idx),
-                "gold_answer": "",
-                "relevant_passage_ids": [],
-                "workload_kind": "out_of_dataset",
-                "repeat_of": None,
-            })
+            entries.append(
+                {
+                    "query_id": f"ood:{lang}:{idx}",
+                    "language": lang,
+                    "query": ood_templates[lang][0].format(seed + idx),
+                    "gold_answer": "",
+                    "relevant_passage_ids": [],
+                    "workload_kind": "out_of_dataset",
+                    "repeat_of": None,
+                }
+            )
         rng.shuffle(entries)
         workload.extend(entries)
     return workload
 
 
 def wait_ready(proc, timeout=300):
+    """Wait for the backend server to report ready."""
     deadline = time.time() + timeout
     last = ""
     while time.time() < deadline:
@@ -118,15 +129,21 @@ def clear_backend_cache():
         # POST to health endpoint to get cache stats, then restart to clear
         # Since there's no explicit cache-clear endpoint, we rely on backend restart
         pass
-    except Exception:
+    except requests.RequestException:
         pass
 
 
 def call(item, generate):
+    """Execute a single query against the backend."""
     started = time.perf_counter()
     response = requests.post(
         f"{BASE_URL}/api/query",
-        json={"query": item["query"], "language": item["language"], "top_k": 10, "generate": generate},
+        json={
+            "query": item["query"],
+            "language": item["language"],
+            "top_k": 10,
+            "generate": generate,
+        },
         timeout=30,
     )
     wall_ms = (time.perf_counter() - started) * 1000.0
@@ -154,11 +171,13 @@ def call(item, generate):
         "results_count": len(body.get("results", [])),
         "gold_ids": item.get("relevant_passage_ids", []),
         "retrieved_ids": [x.get("id") or x.get("doc_id") for x in body.get("results", [])],
-        "is_cold": not bool(cache.get("response_cache_hit", False)) and not bool(cache.get("retrieval_cache_hit", False)),
+        "is_cold": not bool(cache.get("response_cache_hit", False))
+        and not bool(cache.get("retrieval_cache_hit", False)),
     }
 
 
 def start_backend(generate):
+    """Start the backend in a new subprocess with the correct configuration."""
     env = os.environ.copy()
     env["HHG_CACHE_ENABLED"] = "true"
     env["CACHE_ENABLED"] = "true"
@@ -167,8 +186,20 @@ def start_backend(generate):
     env["HHG_SLM_ENABLED"] = "true" if generate else "false"
     env_file = ROOT / "backend" / ".env"
     # Starting a fresh backend process clears all in-memory caches (cold start)
+    # pylint: disable=consider-using-with
     proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", "8000", "--env-file", str(env_file)],
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "backend.main:app",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "8000",
+            "--env-file",
+            str(env_file),
+        ],
         cwd=str(ROOT),
         env=env,
         stdout=subprocess.DEVNULL,
@@ -179,6 +210,7 @@ def start_backend(generate):
 
 
 def run_mode(workload, generate, seed):
+    """Run the benchmark in a specific generation mode (RAG_ONLY or RAG+SLM)."""
     proc = start_backend(generate)
     rows = []
     errors = []
@@ -195,13 +227,13 @@ def run_mode(workload, generate, seed):
                 }
                 try:
                     call(warmup, generate)
-                except Exception:
+                except (RuntimeError, requests.RequestException):
                     pass
         for item in workload:
             try:
                 row = call(item, generate)
                 rows.append(row)
-            except Exception as exc:
+            except (RuntimeError, requests.RequestException) as exc:
                 errors.append({"query_id": item["query_id"], "error": str(exc)})
     finally:
         proc.terminate()
@@ -213,8 +245,17 @@ def run_mode(workload, generate, seed):
     # Count SLM calls (generation_ms > 0 means SLM was called)
     slm_calls = sum(1 for r in rows if r.get("generation_ms", 0) > 0)
     timeout_count = sum(1 for r in rows if r.get("answer_source") == "generated-unavailable")
-    fallback_count = sum(1 for r in rows if r.get("answer_source") in ("extractive", "abstain") and r.get("workload_kind") != "out_of_dataset")
-    ood_abstentions = sum(1 for r in rows if r.get("workload_kind") == "out_of_dataset" and r.get("answer_source") == "abstain")
+    fallback_count = sum(
+        1
+        for r in rows
+        if r.get("answer_source") in ("extractive", "abstain")
+        and r.get("workload_kind") != "out_of_dataset"
+    )
+    ood_abstentions = sum(
+        1
+        for r in rows
+        if r.get("workload_kind") == "out_of_dataset" and r.get("answer_source") == "abstain"
+    )
     ood_total = sum(1 for r in rows if r.get("workload_kind") == "out_of_dataset")
 
     # Verify repeated-query invariant
@@ -223,7 +264,9 @@ def run_mode(workload, generate, seed):
     for r in repeated_rows:
         if r["response_cache_hit"]:
             if r["generation_ms"] != 0.0:
-                invariant_violations.append({"query_id": r["query_id"], "issue": "response_cache_hit but generation_ms > 0"})
+                invariant_violations.append(
+                    {"query_id": r["query_id"], "issue": "response_cache_hit but generation_ms > 0"}
+                )
 
     out = {
         "mode": "rag+slm" if generate else "rag_only",
@@ -281,6 +324,7 @@ def run_mode(workload, generate, seed):
 
 
 def main():
+    """Main entrypoint for the benchmark script."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--ground-truth", default="hhg_rag_artifacts/ground_truth.json")
     parser.add_argument("--per-language", type=int, default=100)
@@ -293,14 +337,44 @@ def main():
         "seed": args.seed,
         "per_language": args.per_language,
         "total_requests": len(workload),
-        "counts": {kind: sum(x["workload_kind"] == kind for x in workload) for kind in ["unique", "repeated", "out_of_dataset"]},
-        "counts_by_language": {lang: {kind: sum(x["language"] == lang and x["workload_kind"] == kind for x in workload) for kind in ["unique", "repeated", "out_of_dataset"]} for lang in LANGUAGES},
+        "counts": {
+            kind: sum(x["workload_kind"] == kind for x in workload)
+            for kind in ["unique", "repeated", "out_of_dataset"]
+        },
+        "counts_by_language": {
+            lang: {
+                kind: sum(x["language"] == lang and x["workload_kind"] == kind for x in workload)
+                for kind in ["unique", "repeated", "out_of_dataset"]
+            }
+            for lang in LANGUAGES
+        },
     }
     output = {"workload": manifest, "modes": []}
     for generate in [False, True]:
         output["modes"].append(run_mode(workload, generate, args.seed))
     Path(args.output).write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(json.dumps({"output": args.output, "workload": manifest, "mode_summaries": [{"mode": x["mode"], "overall": x["overall"], "slm_calls": x.get("slm_calls", 0), "timeout_count": x.get("timeout_count", 0), "ood_abstentions": x.get("ood_abstentions", 0), "invariant_violations": len(x.get("invariant_violations", [])), "errors": len(x["errors"])} for x in output["modes"]]}, ensure_ascii=False, indent=2))
+    print(
+        json.dumps(
+            {
+                "output": args.output,
+                "workload": manifest,
+                "mode_summaries": [
+                    {
+                        "mode": x["mode"],
+                        "overall": x["overall"],
+                        "slm_calls": x.get("slm_calls", 0),
+                        "timeout_count": x.get("timeout_count", 0),
+                        "ood_abstentions": x.get("ood_abstentions", 0),
+                        "invariant_violations": len(x.get("invariant_violations", [])),
+                        "errors": len(x["errors"]),
+                    }
+                    for x in output["modes"]
+                ],
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":
