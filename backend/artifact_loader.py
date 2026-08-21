@@ -546,11 +546,17 @@ class ArtifactLoader:
         language: str,
     ) -> Optional[Path]:
 
+        # Prefer FAISS-format indexes (.faiss) over legacy hnswlib (.bin).
         candidates = [
+            language_root / "hnsw" / language / "index.faiss",
             language_root / "hnsw" / language / "index.bin",
+            language_root / "hnsw" / "index.faiss",
             language_root / "hnsw" / "index.bin",
+            language_root / "hnsw" / "hnsw_index.faiss",
             language_root / "hnsw" / "hnsw_index.bin",
+            language_root / "index.faiss",
             language_root / "index.bin",
+            language_root / "hnsw_index.faiss",
             language_root / "hnsw_index.bin",
         ]
 
@@ -561,10 +567,16 @@ class ArtifactLoader:
         hnsw_dir = language_root / "hnsw" / language
 
         if hnsw_dir.is_dir():
+            # Prefer .faiss over .bin.
+            faiss_files = sorted(
+                hnsw_dir.glob("*.faiss")
+            )
+            if faiss_files:
+                return faiss_files[0]
+
             binaries = sorted(
                 hnsw_dir.glob("*.bin")
             )
-
             if binaries:
                 return binaries[0]
 

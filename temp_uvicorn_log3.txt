@@ -1,7 +1,0 @@
-﻿Sending 100 requests to /api/voice...
-Request 1 status: 200
-Request 2 status: 200
-Request 3 status: 200
-Request 4 status: 200
-Request 5 status: 200
-Request 6 status: 200

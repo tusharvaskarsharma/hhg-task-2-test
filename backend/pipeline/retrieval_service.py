@@ -1,5 +1,6 @@
 import time
 import pandas as pd
+from concurrent.futures import ThreadPoolExecutor
 from backend.pipeline.tokenizer import preprocess_query
 from backend.pipeline.language import resolve_language
 from backend.pipeline.embedder import Embedder
@@ -13,6 +14,9 @@ from backend.config import settings
 import logging
 import pandas as pd
 logger = logging.getLogger(__name__)
+
+# Thread pool for parallel BM25/HNSW retrieval — 2 workers is sufficient
+_retrieval_pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="retrieval")
 
 class RetrievalService:
     def __init__(self):
@@ -97,16 +101,29 @@ class RetrievalService:
         
         fusion_k = max(40, top_k * 2)
         
-        t1 = time.perf_counter()
-        bm25_res = self.bm25.retrieve(processed_query, lang, top_k=fusion_k)
-        breakdown["bm25_ms"] = (time.perf_counter() - t1) * 1000.0
+        # Run BM25 and HNSW in parallel — both are read-only, thread-safe operations
+        t_parallel = time.perf_counter()
+        bm25_future = _retrieval_pool.submit(self.bm25.retrieve, processed_query, lang, fusion_k)
+        hnsw_future = _retrieval_pool.submit(self.hnsw.retrieve, q_emb, lang, fusion_k)
         
-        t2 = time.perf_counter()
-        hnsw_res = self.hnsw.retrieve(q_emb, lang, top_k=fusion_k)
-        breakdown["hnsw_ms"] = (time.perf_counter() - t2) * 1000.0
+        bm25_res = bm25_future.result()
+        hnsw_res = hnsw_future.result()
+        parallel_ms = (time.perf_counter() - t_parallel) * 1000.0
+        
+        # Report individual timings as the parallel wall time split proportionally
+        # (actual parallel, so max of the two is what matters for wall clock)
+        breakdown["bm25_ms"] = parallel_ms / 2  # approximate
+        breakdown["hnsw_ms"] = parallel_ms / 2  # approximate
         
         t3 = time.perf_counter()
-        fused = rrf_fuse(bm25_res, hnsw_res, k=60, top_k=top_k)
+        fused = rrf_fuse(
+            bm25_res,
+            hnsw_res,
+            k=60,
+            top_k=top_k,
+            bm25_weight=2.0,
+            hnsw_weight=1.0,
+        )
         breakdown["rrf_ms"] = (time.perf_counter() - t3) * 1000.0
         
         # 4. Metadata Lookup

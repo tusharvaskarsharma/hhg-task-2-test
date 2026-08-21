@@ -20,19 +20,8 @@ class SLMClient:
         self.max_tokens = settings.SLM_MAX_TOKENS
         self.temperature = settings.SLM_TEMPERATURE
         
-        # Configure session with retries
-        from requests.adapters import HTTPAdapter
-        from urllib3.util.retry import Retry
+        # Persistent session for TCP connection reuse — no retries on critical path
         self.session = requests.Session()
-        retries = Retry(
-            total=3,
-            backoff_factor=0.5,
-            status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["POST"]
-        )
-        adapter = HTTPAdapter(max_retries=retries)
-        self.session.mount("http://", adapter)
-        self.session.mount("https://", adapter)
 
     def generate(self, prompt: str) -> str:
         if not self.enabled:
@@ -56,7 +45,7 @@ class SLMClient:
                 self.base_url,
                 json=payload,
                 headers=headers,
-                timeout=self.timeout
+                timeout=(min(self.timeout, 2), self.timeout)  # (connect_timeout, read_timeout)
             )
             response.raise_for_status()
             
@@ -75,10 +64,10 @@ class SLMClient:
             raise SLMClientError("Upstream SLM timeout", status_code=504)
         except requests.exceptions.HTTPError as e:
             status_code = e.response.status_code
-            logger.error(f"SLM HTTP Error {status_code}: {e.response.text}")
+            logger.error(f"SLM HTTP Error {status_code}")
             raise SLMClientError("Upstream SLM failed", status_code=502)
         except requests.exceptions.RequestException as e:
-            logger.error(f"SLM Request Error: {str(e)}")
+            logger.error(f"SLM Request Error: {type(e).__name__}")
             raise SLMClientError("Upstream SLM connection failed", status_code=502)
         except ValueError:
             logger.error("Failed to parse SLM response as JSON.")

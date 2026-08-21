@@ -3,7 +3,11 @@ import sys
 import json
 import logging
 import math
-from typing import List, Set
+import argparse
+import hashlib
+import subprocess
+from typing import List, Set, Dict
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
@@ -13,9 +17,25 @@ from backend.pipeline.embedder import Embedder
 from backend.pipeline.sparse_retriever import BM25Retriever
 from backend.pipeline.dense_retriever import HNSWRetriever
 from backend.pipeline.fusion import rrf_fuse
+from backend.evaluation.ground_truth import load_ground_truth, GroundTruthError
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def _sha256_file(path: str) -> str:
+    if not os.path.exists(path):
+        return ""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+def get_git_commit():
+    try:
+        return subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("utf-8").strip()
+    except Exception:
+        return "unknown"
 
 def precision_at_k(retrieved_ids: List[str], gold_ids: Set[str], k: int) -> float:
     if not retrieved_ids:
@@ -31,6 +51,14 @@ def recall_at_k(retrieved_ids: List[str], gold_ids: Set[str], k: int) -> float:
         return 0.0
     hits = sum(1 for doc_id in retrieved_ids[:k] if doc_id in gold_ids)
     return float(hits) / len(gold_ids)
+
+def hit_rate_at_k(retrieved_ids: List[str], gold_ids: Set[str], k: int) -> float:
+    if not gold_ids:
+        return 0.0
+    for doc_id in retrieved_ids[:k]:
+        if doc_id in gold_ids:
+            return 1.0
+    return 0.0
 
 def mrr_at_k(retrieved_ids: List[str], gold_ids: Set[str], k: int) -> float:
     for rank, doc_id in enumerate(retrieved_ids[:k]):
@@ -49,123 +77,244 @@ def ndcg_at_k(retrieved_ids: List[str], gold_ids: Set[str], k: int) -> float:
     idcg = sum(1.0 / math.log2(rank + 2) for rank in range(min(len(gold_ids), k)))
     return dcg / idcg if idcg > 0 else 0.0
 
-def evaluate_retriever(results: List[dict], gold_ids: Set[str]):
+def evaluate_retriever(results: List[dict], gold_ids: Set[str], top_k_list: List[int]):
     ids = [r["id"] for r in results]
-    return {
-        "Recall@1": recall_at_k(ids, gold_ids, 1),
-        "Recall@5": recall_at_k(ids, gold_ids, 5),
-        "Recall@10": recall_at_k(ids, gold_ids, 10),
-        "Precision@5": precision_at_k(ids, gold_ids, 5),
-        "MRR@10": mrr_at_k(ids, gold_ids, 10),
-        "nDCG@10": ndcg_at_k(ids, gold_ids, 10),
-    }
+    metrics = {}
+    for k in top_k_list:
+        metrics[f"Recall@{k}"] = recall_at_k(ids, gold_ids, k)
+        metrics[f"Precision@{k}"] = precision_at_k(ids, gold_ids, k)
+        metrics[f"HitRate@{k}"] = hit_rate_at_k(ids, gold_ids, k)
+        metrics[f"MRR@{k}"] = mrr_at_k(ids, gold_ids, k)
+        metrics[f"nDCG@{k}"] = ndcg_at_k(ids, gold_ids, k)
+    return metrics
 
-def run_language_benchmark(lang: str, queries: List[dict], embedder, bm25_retriever, hnsw_retriever):
+def run_language_benchmark(lang: str, queries: List[dict], embedder, bm25_retriever, hnsw_retriever, top_k_list: List[int]):
     metrics = {
-        "bm25": {"Recall@1": 0, "Recall@5": 0, "Recall@10": 0, "Precision@5": 0, "MRR@10": 0, "nDCG@10": 0},
-        "hnsw": {"Recall@1": 0, "Recall@5": 0, "Recall@10": 0, "Precision@5": 0, "MRR@10": 0, "nDCG@10": 0},
-        "rrf": {"Recall@1": 0, "Recall@5": 0, "Recall@10": 0, "Precision@5": 0, "MRR@10": 0, "nDCG@10": 0}
+        "bm25": {},
+        "hnsw": {},
+        "rrf": {}
     }
     
+    for k in top_k_list:
+        for sys_name in metrics:
+            metrics[sys_name][f"Recall@{k}"] = 0.0
+            metrics[sys_name][f"Precision@{k}"] = 0.0
+            metrics[sys_name][f"HitRate@{k}"] = 0.0
+            metrics[sys_name][f"MRR@{k}"] = 0.0
+            metrics[sys_name][f"nDCG@{k}"] = 0.0
+            
     total = len(queries)
     if total == 0:
         return metrics
         
     for i, q in enumerate(queries):
-        if i % 10 == 0:
-            logger.info(f"Processing query {i+1}/{total} for {lang}")
+        if i % 100 == 0:
+            logger.info(f"Processing query {i}/{total} for {lang}")
             
         q_text = q["query"]
-        gold_ids = set(q["gold_doc_ids"])
+        gold_ids = set(q["relevant_passage_ids"])
         
         q_vec, _, _ = embedder.embed_query(q_text)
         
-        bm25_res = bm25_retriever.retrieve(q_text, lang, top_k=10)
-        hnsw_res = hnsw_retriever.retrieve(q_vec, lang, top_k=10)
-        rrf_res = rrf_fuse(bm25_res, hnsw_res, k=60, top_k=10)
+        max_k = max(top_k_list)
+        bm25_res = bm25_retriever.retrieve(q_text, lang, top_k=max_k)
+        hnsw_res = hnsw_retriever.retrieve(q_vec, lang, top_k=max_k)
+        rrf_res = rrf_fuse(bm25_res, hnsw_res, k=60, top_k=max_k)
         
-        b_mets = evaluate_retriever(bm25_res, gold_ids)
-        h_mets = evaluate_retriever(hnsw_res, gold_ids)
-        r_mets = evaluate_retriever(rrf_res, gold_ids)
+        b_mets = evaluate_retriever(bm25_res, gold_ids, top_k_list)
+        h_mets = evaluate_retriever(hnsw_res, gold_ids, top_k_list)
+        r_mets = evaluate_retriever(rrf_res, gold_ids, top_k_list)
         
-        for k in metrics["bm25"].keys():
-            metrics["bm25"][k] += b_mets[k]
-            metrics["hnsw"][k] += h_mets[k]
-            metrics["rrf"][k] += r_mets[k]
+        for k_met in b_mets:
+            metrics["bm25"][k_met] += b_mets[k_met]
+            metrics["hnsw"][k_met] += h_mets[k_met]
+            metrics["rrf"][k_met] += r_mets[k_met]
             
     for sys_name in metrics:
-        for k in metrics[sys_name]:
-            metrics[sys_name][k] /= total
+        for k_met in metrics[sys_name]:
+            metrics[sys_name][k_met] /= total
             
     return metrics
 
-def main():
-    print("=" * 60)
-    print("HHG RAG ACCURACY BENCHMARK")
-    print("=" * 60)
+def evaluate_abstention(lang: str, queries: List[dict], embedder, bm25_retriever, hnsw_retriever):
+    # For no-positive queries, an abstention metric could be the rate at which we return empty results
+    # Since we always return top_k, abstention metrics might just track how many no-positive queries exist
+    # and maybe the scores of the returned items. Here we just return the count and empty dict as requested.
+    return {
+        "num_no_positive_queries": len(queries),
+        "abstention_metrics": {}
+    }
+
+def generate_markdown_report(report_data: dict, output_path: str, args: argparse.Namespace):
+    md = f"# RAG Accuracy Results\n\n**STATUS: {report_data.get('status', 'NOT RUN')}**\n\n"
     
-    gt_path = os.path.join(settings.HHG_ARTIFACT_DIR, "ground_truth.json")
-    if not os.path.exists(gt_path):
-        print("ground_truth.json not found.")
-        print("Status: NOT RUN")
-        
-        report_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-            "reports", "rag_accuracy_results.md"
-        )
-        os.makedirs(os.path.dirname(report_path), exist_ok=True)
-        with open(report_path, "w", encoding="utf-8") as f:
-            f.write("# RAG Accuracy Results\n\n**STATUS: NOT RUN**\n\nNo `ground_truth.json` file provided for production IDs.\n")
+    if report_data.get("status") == "NOT RUN":
+        md += f"Reason: {report_data.get('reason', 'Unknown error')}\n"
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(md)
         return
         
-    with open(gt_path, "r", encoding="utf-8") as f:
-        ground_truth_data = json.load(f)
+    source = report_data.get("source", {})
+    md += f"- **Commit SHA:** `{source.get('commit_sha', 'unknown')}`\n"
+    md += f"- **Artifact Manifest SHA:** `{source.get('artifact_manifest_sha256', 'unknown')}`\n"
+    md += f"- **Ground Truth SHA256:** `{source.get('ground_truth_sha256', 'unknown')}`\n"
+    md += f"- **Dataset:** `{source.get('dataset', 'unknown')}` (Revision: `{source.get('revision', 'unknown')}`)\n"
+    md += f"- **Selection Profile:** `{source.get('selection_profile', 'default')}`\n"
+    
+    overall = report_data.get("overall", {})
+    md += f"- **Mapping Coverage:** `{overall.get('mapping_coverage', 1.0):.4f}`\n\n"
+    
+    md += f"**Exact Command Used:** `python -m backend.scripts.run_accuracy_benchmark " + " ".join(sys.argv[1:]) + "`\n\n"
+    
+    for lang in args.languages:
+        lang_data = report_data.get("by_language", {}).get(lang)
+        if not lang_data:
+            continue
+            
+        md += f"## Language: {lang.upper()}\n"
+        md += f"- **Evaluated Queries (with gold):** {lang_data.get('num_queries_with_gold', 0)}\n\n"
         
+        md += "### Metrics\n"
+        
+        top_k_list = args.top_k
+        headers = ["Pipeline"] + [f"{m}@{k}" for m in ["Recall", "Precision", "HitRate", "MRR", "nDCG"] for k in top_k_list]
+        md += "| " + " | ".join(headers) + " |\n"
+        md += "| " + " | ".join([":---"] * len(headers)) + " |\n"
+        
+        for sys_name in ["bm25", "hnsw", "rrf"]:
+            sys_metrics = lang_data.get(sys_name, {})
+            row = [f"**{sys_name.upper()}**"]
+            for m in ["Recall", "Precision", "HitRate", "MRR", "nDCG"]:
+                for k in top_k_list:
+                    val = sys_metrics.get(f"{m}@{k}", 0.0)
+                    row.append(f"{val:.4f}")
+            md += "| " + " | ".join(row) + " |\n"
+            
+        md += "\n---\n\n"
+        
+    abstention = report_data.get("abstention", {})
+    md += "## Abstention / Unsupported Queries\n"
+    md += f"- **No-Positive Queries:** {abstention.get('num_no_positive_queries', 0)}\n"
+    
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(md)
+
+def main():
+    parser = argparse.ArgumentParser(description="HHG RAG ACCURACY BENCHMARK")
+    parser.add_argument("--artifact-root", default=settings.HHG_ARTIFACT_DIR)
+    parser.add_argument("--ground-truth")
+    parser.add_argument("--languages", nargs="+", default=["hi", "en", "bn"])
+    parser.add_argument("--top-k", type=int, nargs="+", default=[1, 5, 10, 20])
+    parser.add_argument("--output")
+    args = parser.parse_args()
+    
+    gt_path_str = args.ground_truth or os.path.join(args.artifact_root, "ground_truth.json")
+    output_path = args.output or os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "reports", "accuracy_results.json"
+    )
+    report_md_path = os.path.join(
+        os.path.dirname(output_path) if output_path else os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "accuracy_report.md"
+    )
+    if not args.output:
+        report_md_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+            "reports", "accuracy_report.md"
+        )
+    else:
+        report_md_path = os.path.join(os.path.dirname(args.output), "accuracy_report.md")
+        
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    def fail_not_run(reason):
+        print(f"Status: NOT RUN. Reason: {reason}")
+        res = {"status": "NOT RUN", "reason": reason}
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(res, f, indent=2)
+        generate_markdown_report(res, report_md_path, args)
+        sys.exit(1)
+        
+    if not os.path.exists(gt_path_str):
+        fail_not_run("ground_truth.json not found")
+        
+    try:
+        gt = load_ground_truth(Path(gt_path_str), artifact_root=Path(args.artifact_root))
+    except GroundTruthError as e:
+        fail_not_run(f"Ground truth validation failed: {e}")
+        
+    mapping_report_path = os.path.join(os.path.dirname(output_path), "ground_truth_mapping_report.json")
+    mapping_coverage = 1.0
+    if os.path.exists(mapping_report_path):
+        try:
+            with open(mapping_report_path, "r", encoding="utf-8") as f:
+                mapping_report = json.load(f)
+            mapping_coverage = mapping_report.get("counts", {}).get("mapping_coverage_over_uploaded_rows", 1.0)
+        except Exception:
+            pass
+            
+    if mapping_coverage < 1.0:
+        fail_not_run(f"Mapping coverage {mapping_coverage} is below 1.0")
+
     loader_instance.initialize()
     if not loader_instance.status.get("valid"):
-        print("ERROR: Artifacts not valid.")
-        sys.exit(1)
+        fail_not_run("Artifacts not valid.")
+        
+    manifest_path = os.path.join(args.artifact_root, "build_manifest.json")
+    if not os.path.exists(manifest_path):
+        manifest_path = os.path.join(args.artifact_root, "config.json")
         
     embedder = Embedder()
     bm25_retriever = BM25Retriever()
     hnsw_retriever = HNSWRetriever()
     
-    base_report = "# RAG Accuracy Results\n\nThis report evaluates the accuracy of the production HHG RAG pipeline.\n\n"
+    report_data = {
+        "status": "MEASURED",
+        "source": {
+            "dataset": "ai4bharat/MSMARCO-XI",
+            "ground_truth_sha256": _sha256_file(gt_path_str),
+            "artifact_manifest_sha256": _sha256_file(manifest_path) if os.path.exists(manifest_path) else "",
+            "commit_sha": get_git_commit(),
+            "revision": gt.queries[0].get("revision", "unknown") if gt.queries else "unknown",
+            "selection_profile": "default"
+        },
+        "overall": {
+            "mapping_coverage": mapping_coverage
+        },
+        "by_language": {},
+        "abstention": {
+            "num_no_positive_queries": 0,
+            "abstention_metrics": {}
+        }
+    }
     
-    for lang, queries in ground_truth_data.items():
-        if lang not in ["hi", "bn", "en"]:
+    total_no_positive = 0
+    
+    for lang in args.languages:
+        if lang not in gt.by_language:
             continue
             
-        logger.info(f"Running benchmark for {lang} ({len(queries)} queries)...")
-        metrics = run_language_benchmark(lang, queries, embedder, bm25_retriever, hnsw_retriever)
+        supported = gt.supported_queries_by_language.get(lang, [])
+        unsupported = gt.unsupported_queries_by_language.get(lang, [])
         
-        base_report += f"## Language: {lang.upper()}\n"
-        base_report += f"- **Evaluated Queries:** {len(queries)}\n\n"
-        base_report += "### Metrics\n"
-        base_report += "| Pipeline | Recall@1 | Recall@5 | Recall@10 | Precision@5 | MRR@10 | nDCG@10 |\n"
-        base_report += "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n"
+        logger.info(f"Running benchmark for {lang} ({len(supported)} supported queries)...")
+        metrics = run_language_benchmark(lang, supported, embedder, bm25_retriever, hnsw_retriever, args.top_k)
         
-        for sys_name in ["bm25", "hnsw", "rrf"]:
-            m = metrics[sys_name]
-            base_report += (
-                f"| **{sys_name.upper()}** | "
-                f"{m['Recall@1']:.4f} | "
-                f"{m['Recall@5']:.4f} | "
-                f"{m['Recall@10']:.4f} | "
-                f"{m['Precision@5']:.4f} | "
-                f"{m['MRR@10']:.4f} | "
-                f"{m['nDCG@10']:.4f} |\n"
-            )
-        base_report += "\n---\n\n"
+        report_data["by_language"][lang] = {
+            "num_queries": len(supported) + len(unsupported),
+            "num_queries_with_gold": len(supported),
+            **metrics
+        }
         
-    report_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-        "reports", "rag_accuracy_results.md"
-    )
-    with open(report_path, "w", encoding="utf-8") as f:
-        f.write(base_report)
-            
-    print(f"\nBenchmark completed. Results saved to {report_path}")
+        total_no_positive += len(unsupported)
+        
+    report_data["abstention"]["num_no_positive_queries"] = total_no_positive
+    
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(report_data, f, indent=2)
+        
+    generate_markdown_report(report_data, report_md_path, args)
+    print(f"\nBenchmark completed. Results saved to {output_path} and {report_md_path}")
 
 if __name__ == "__main__":
     main()

@@ -1,9 +1,0 @@
-{
-  "timestamp": "2026-08-19T21:02:28.950406Z",
-  "commit": "b5dad0db5d577f66b874cf8d88a0ccd57565de9f",
-  "python": "3.13.14",
-  "platform": "Windows-11-10.0.26200-SP0",
-  "artifact_root": "e:\\HHG_T2\\HHG\\hhg_rag_artifacts",
-  "artifact_manifest_sha256": "a7a071b88f6f6800",
-  "notes": "Prepared for final benchmark"
-}

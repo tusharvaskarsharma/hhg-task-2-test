@@ -1,6 +1,10 @@
 import re
+import unicodedata
 
 def preprocess_query(query: str) -> str:
+    # Unicode NFC normalization (critical for Hindi/Bengali consistency)
+    query = unicodedata.normalize("NFC", query)
+    
     # Handle leading/trailing whitespace
     query = query.strip()
     
@@ -9,3 +13,4 @@ def preprocess_query(query: str) -> str:
     
     # Do not transliterate Hindi/Bengali/English. Do not aggressively lowercase.
     return query
+

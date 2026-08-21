@@ -1,0 +1,23 @@
+flowchart TD
+    A[User selects Hindi, English, or Bengali] --> B[Submit question]
+    B --> C[Normalize query and build cache key]
+    C --> D{Retrieval cache hit?}
+    D -->|yes| E[Reuse ranked passages]
+    D -->|no| F[Tokenize query]
+    F --> G[BM25 sparse retrieval]
+    F --> H[ONNX embedding]
+    H --> I[HNSW dense retrieval]
+    G --> J[RRF fusion]
+    I --> J
+    J --> E
+    E --> K{Out-of-dataset / low confidence?}
+    K -->|yes| L[Abstain safely]
+    K -->|no| M{RAG_ONLY or generate enabled?}
+    M -->|RAG_ONLY| N[Extractive grounded answer]
+    M -->|RAG+SLM| O{Response cache hit?}
+    O -->|yes| P[Return cached grounded SLM answer]
+    O -->|no| Q[Call SLM with timeout and fallback]
+    Q --> P
+    L --> R[Return response with citations / grounding metadata]
+    N --> R
+    P --> R

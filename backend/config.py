@@ -23,16 +23,30 @@ class Settings:
     ONNX_INTER_THREADS = int(os.getenv("HHG_ONNX_INTER_THREADS", "0"))
 
     # Cache
-    CACHE_ENABLED = parse_bool(
-        os.getenv("HHG_CACHE_ENABLED") or os.getenv("CACHE_ENABLED"), default=True
+    # Retrieval cache variables fallback to older CACHE_ variables for backwards compatibility
+    RETRIEVAL_CACHE_ENABLED = parse_bool(
+        os.getenv("HHG_RETRIEVAL_CACHE_ENABLED") or os.getenv("HHG_CACHE_ENABLED") or os.getenv("CACHE_ENABLED"), default=True
     )
-    CACHE_MAX_SIZE = int(
-        os.getenv("HHG_CACHE_MAX_SIZE") or os.getenv("CACHE_MAX_SIZE", "1000")
+    RETRIEVAL_CACHE_MAX_SIZE = int(
+        os.getenv("HHG_RETRIEVAL_CACHE_MAX_SIZE") or os.getenv("HHG_CACHE_MAX_SIZE") or os.getenv("CACHE_MAX_SIZE", "1000")
     )
-    CACHE_TTL_SECONDS = int(
-        os.getenv("HHG_CACHE_TTL_SECONDS") or os.getenv("CACHE_TTL_SECONDS", "3600")
+    RETRIEVAL_CACHE_TTL_SECONDS = int(
+        os.getenv("HHG_RETRIEVAL_CACHE_TTL_SECONDS") or os.getenv("HHG_CACHE_TTL_SECONDS") or os.getenv("CACHE_TTL_SECONDS", "3600")
     )
-    CACHE_VERSION = os.getenv("HHG_CACHE_VERSION") or os.getenv("CACHE_VERSION", "v1")
+    
+    # New Response Cache settings
+    RESPONSE_CACHE_ENABLED = parse_bool(
+        os.getenv("HHG_RESPONSE_CACHE_ENABLED"), default=True
+    )
+    RESPONSE_CACHE_MAX_SIZE = int(
+        os.getenv("HHG_RESPONSE_CACHE_MAX_SIZE", "500")
+    )
+    RESPONSE_CACHE_TTL_SECONDS = int(
+        os.getenv("HHG_RESPONSE_CACHE_TTL_SECONDS", "900")
+    )
+    
+    # Common Cache Settings
+    CACHE_SCHEMA_VERSION = os.getenv("HHG_CACHE_SCHEMA_VERSION") or os.getenv("HHG_CACHE_VERSION") or os.getenv("CACHE_VERSION", "v2")
 
     # API Settings
     CORS_ORIGINS = [
@@ -60,13 +74,19 @@ class Settings:
     SLM_BASE_URL = os.getenv("HHG_SLM_BASE_URL", "https://api.groq.com/openai/v1/chat/completions")
     SLM_MODEL = os.getenv("HHG_SLM_MODEL", "llama-3.1-8b-instant")
     SLM_API_KEY = os.getenv("HHG_SLM_API_KEY", "")
-    SLM_TIMEOUT_SECONDS = int(os.getenv("HHG_SLM_TIMEOUT_SECONDS", "10"))
-    SLM_MAX_TOKENS = int(os.getenv("HHG_SLM_MAX_TOKENS", "256"))
+    SLM_TIMEOUT_SECONDS = float(os.getenv("HHG_SLM_TIMEOUT_SECONDS", "0.2"))
+
+    SLM_MAX_TOKENS = int(os.getenv("HHG_SLM_MAX_TOKENS", "128"))
     SLM_TEMPERATURE = float(os.getenv("HHG_SLM_TEMPERATURE", "0.0"))
+    SLM_COALESCE_TIMEOUT_SECONDS = int(os.getenv("HHG_SLM_COALESCE_TIMEOUT_SECONDS", "30"))
 
     # Grounding Settings
-    GROUNDING_TOP_K = int(os.getenv("HHG_GROUNDING_TOP_K", "5"))
-    MAX_CONTEXT_CHARS = int(os.getenv("HHG_MAX_CONTEXT_CHARS", "12000"))
+    GROUNDING_TOP_K = int(os.getenv("HHG_GROUNDING_TOP_K", "3"))
+    MAX_CONTEXT_CHARS = int(os.getenv("HHG_MAX_CONTEXT_CHARS", "4000"))
+
+    # Prompt and Grounding Policy Versioning
+    PROMPT_VERSION = os.getenv("HHG_PROMPT_VERSION", "v2")
+    GROUNDING_VERSION = os.getenv("HHG_GROUNDING_VERSION", "v1")
 
     # Extractive Settings
     EXTRACTIVE_MIN_QUERY_COVERAGE = float(os.getenv("HHG_EXTRACTIVE_MIN_QUERY_COVERAGE", "0.60"))

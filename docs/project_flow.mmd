@@ -1,0 +1,20 @@
+flowchart LR
+    U[User / Client] --> API[FastAPI Query Route]
+    API --> C1{Retrieval Cache}
+    C1 -->|hit| R[Ranked Context]
+    C1 -->|miss| E[Offline E5 ONNX Embedder]
+    E --> D[Dense HNSW / FAISS Runtime]
+    API --> S[Sparse BM25S Retriever]
+    S --> F[RRF Fusion\nBM25:HNSW = 2:1]
+    D --> F
+    F --> C1
+    R --> G{generate?}
+    G -->|false| X[Extractive Answer / OOD Abstention]
+    G -->|true| C2{Response Cache}
+    C2 -->|hit| A[Cached Grounded Answer]
+    C2 -->|miss| L[Groq SLM with 0.2 s timeout]
+    L --> A
+    X --> RESP[Validated API Response]
+    A --> RESP
+    RESP --> U
+    ART[Offline Artifact Bundle\nBM25, metadata, tokenizer, ONNX, HNSW, ground truth] --> API

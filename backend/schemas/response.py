@@ -48,7 +48,15 @@ class QueryResponse(BaseModel):
     )
     grounding: dict = Field(default={"enabled": False, "grounded": False, "sources": []}, description="Grounding metadata and citations")
     results: List[RetrievalResult] = Field(description="List of ranked retrieval results")
-    cache: dict = Field(default={"hit": False}, description="Metadata indicating cache status")
+    cache: dict = Field(default={
+        "hit": False,
+        "enabled": False,
+        "cache_layer": "none",
+        "retrieval_cache_hit": False,
+        "response_cache_hit": False,
+        "cache_key_version": "",
+        "cache_lookup_ms": 0.0
+    }, description="Metadata indicating cache status")
     latency: LatencyMetrics = Field(default_factory=LatencyMetrics, description="Latency metadata in milliseconds")
     transcription: Optional[dict] = Field(default=None, description="STT transcription metadata if voice was used. Should contain text, detected_language, and language_source")
     
