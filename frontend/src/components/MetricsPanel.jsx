@@ -6,7 +6,7 @@ const MetricsPanel = ({ latency, cache }) => {
 
   return (
     <div className="w-full mt-6">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         
         {/* TOTAL CARD */}
         <div className="flex flex-col p-4 glass-panel hover:bg-surfaceHover transition-colors border-border/50 border-l-4 border-l-primary relative">
@@ -15,19 +15,6 @@ const MetricsPanel = ({ latency, cache }) => {
           <div className="flex items-baseline space-x-1 mt-auto">
             <span className="text-2xl font-mono font-bold text-primary">
               {latency.total_ms !== undefined ? latency.total_ms.toFixed(2) : '--'}
-            </span>
-            <span className="text-sm text-textMuted">ms</span>
-          </div>
-          <div className="text-[10px] text-textMuted/50 mt-1">Target: not configured</div>
-        </div>
-
-        {/* PARTIAL CARD */}
-        <div className="flex flex-col p-4 glass-panel hover:bg-surfaceHover transition-colors border-border/50 border-l-4 border-l-secondary relative">
-          <div className="text-[10px] uppercase font-bold tracking-wider text-textMuted mb-1">PARTIAL LATENCY</div>
-          <div className="text-xs text-textMuted/70 mb-3">RAG + SLM (Excludes STT)</div>
-          <div className="flex items-baseline space-x-1 mt-auto">
-            <span className="text-2xl font-mono font-bold text-text">
-              {latency.partial_ms !== undefined ? latency.partial_ms.toFixed(2) : '--'}
             </span>
             <span className="text-sm text-textMuted">ms</span>
           </div>

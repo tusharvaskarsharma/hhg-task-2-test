@@ -1,12 +1,16 @@
-import os
-
+import os
+try:
+    from dotenv import load_dotenv
+    # Load .env from the backend directory
+    load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+except ImportError:
+    pass
 
 def parse_bool(value: str | None, default: bool = False) -> bool:
     """Robustly parse a string env-var to bool. Avoids the bool('False') == True trap."""
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
-
 
 class Settings:
     # Set default path to point to the local hhg_rag_artifacts directory in the project root

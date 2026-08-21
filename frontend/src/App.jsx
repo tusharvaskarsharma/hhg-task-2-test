@@ -24,7 +24,7 @@ const App = () => {
   const textAPI = useQuery();
   const voiceAPI = useVoice();
 
-  // Initialization
+  // Initialization (fetches health status on mount)
   useEffect(() => {
     const init = async () => {
       try {
